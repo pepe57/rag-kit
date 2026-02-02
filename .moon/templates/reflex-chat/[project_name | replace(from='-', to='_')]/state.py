@@ -4,9 +4,8 @@ from typing import Any, TypedDict
 import reflex as rx
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-{%- if use_pdf %}
-from pdf_context import extract_text_from_bytes, format_as_context
-{%- endif %}
+
+from context_loader import process_bytes
 
 # Checking if the API keys are set properly
 if not os.getenv("OPENAI_API_KEY"):
@@ -39,7 +38,6 @@ class State(rx.State):
 
     # Whether the new chat modal is open.
     is_modal_open: bool = False
-{%- if use_pdf %}
 
     # The current context from the uploaded PDF.
     context: str = ""
@@ -51,13 +49,13 @@ class State(rx.State):
     is_uploading: bool = False
 
     async def handle_upload(self, files: list[rx.UploadFile]):
-        """Handle the file upload."""
+        """Handle the file upload using context_loader factory."""
         self.is_uploading = True
         for file in files:
             upload_data = await file.read()
-            text = extract_text_from_bytes(upload_data)
-            self.context += format_as_context(text, file.filename or "")
-            self.attached_files.append(file.filename or "unknown")
+            filename = file.filename or "unknown"
+            self.context += process_bytes(upload_data, filename)
+            self.attached_files.append(filename)
         self.is_uploading = False
 
     @rx.event
@@ -74,7 +72,6 @@ class State(rx.State):
         # If no files left, clear context
         if not self.attached_files:
             self.context = ""
-{%- endif %}
 
     @rx.event
     def create_chat(self, form_data: dict[str, Any]):
@@ -182,7 +179,6 @@ class State(rx.State):
                 ),
             }
         ]
-{%- if use_pdf %}
 
         if self.context:
             messages.append(
@@ -194,7 +190,6 @@ class State(rx.State):
                     ),
                 }
             )
-{%- endif %}
 
         for qa in self._chats[self.current_chat]:
             messages.append({"role": "user", "content": qa["question"]})

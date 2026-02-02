@@ -1,7 +1,7 @@
 import reflex as rx
 from reflex.constants.colors import ColorType
 
-from {{ project_name | replace(from='-', to='_') }}.state import QA, State
+from reflex_chat.state import QA, State
 
 
 def message_content(text: str, color: ColorType) -> rx.Component:
@@ -57,8 +57,6 @@ def chat() -> rx.Component:
         padding="8px",
     )
 
-{%- if use_pdf %}
-
 
 def render_attached_file(filename: str) -> rx.Component:
     """Render a single attached file."""
@@ -82,7 +80,6 @@ def render_attached_file(filename: str) -> rx.Component:
         background_color=rx.color("mauve", 3),
         spacing="2",
     )
-{%- endif %}
 
 
 def action_bar() -> rx.Component:
@@ -91,7 +88,6 @@ def action_bar() -> rx.Component:
         rx.vstack(
             rx.form(
                 rx.vstack(
-{%- if use_pdf %}
                     rx.cond(
                         State.attached_files,
                         rx.flex(
@@ -102,9 +98,7 @@ def action_bar() -> rx.Component:
                             width="100%",
                         ),
                     ),
-{%- endif %}
                     rx.hstack(
-{%- if use_pdf %}
                         rx.upload(
                             rx.icon("paperclip", size=18, color=rx.color("mauve", 11)),
                             id="upload_pdf",
@@ -118,7 +112,6 @@ def action_bar() -> rx.Component:
                                 "border_radius": "4px",
                             },
                         ),
-{%- endif %}
                         rx.input(
                             placeholder="Type a message...",
                             id="question",

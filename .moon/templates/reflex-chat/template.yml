@@ -8,7 +8,7 @@ variables:
     prompt: What is the name of your project?
   description:
     type: string
-    default: A Reflex Chat Application
+    default: A Reflex Chat
     prompt: Short description of the project
   openai_api_key:
     type: string

@@ -1,6 +1,6 @@
 import reflex as rx
 
-from {{ project_name | replace(from='-', to='_') }}.state import State
+from reflex_chat.state import State
 
 
 def sidebar_chat(chat: str) -> rx.Component:

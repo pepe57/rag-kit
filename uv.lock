@@ -341,6 +341,7 @@ dependencies = [
     { name = "openai" },
     { name = "pdf-context" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -349,6 +350,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pdf-context", editable = "packages/pdf-context" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
 ]
 
 [[package]]
@@ -2405,6 +2407,7 @@ dependencies = [
     { name = "openai" },
     { name = "pdf-context" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "reflex" },
 ]
 
@@ -2413,6 +2416,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.78.1" },
     { name = "pdf-context", editable = "packages/pdf-context" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "reflex", specifier = ">=0.7.11" },
 ]
 
