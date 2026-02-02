@@ -68,7 +68,13 @@ def generate_sys_config():
         "title": "System Configuration",
         "description": "RAG Facile workspace configuration. Designed to patch moon init defaults.",
         "destination": ".",
-        "variables": {},
+        "variables": {
+            "project_name": {
+                "type": "string",
+                "default": "my-rag-project",
+                "prompt": "What is the name of your project?",
+            },
+        },
     }
     (target / "template.yml").write_text(yaml.dump(template_yml, sort_keys=False))
 
@@ -89,6 +95,29 @@ def generate_sys_config():
         "generator": {"templates": [".moon/templates"]},
     }
     (moon_dir / "workspace.yml").write_text(yaml.dump(workspace, sort_keys=False))
+
+    # Create root pyproject.toml for uv workspace
+    pyproject = '''\
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = "RAG Facile workspace"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = []
+
+[tool.uv]
+managed = true
+
+[tool.uv.workspace]
+members = ["apps/*", "packages/*"]
+'''
+    (target / "pyproject.toml").write_text(pyproject)
+
+    # Pin Python version for uv
+    (target / ".python-version").write_text("3.13\n")
 
     console.print("[green]✓[/green] sys-config generated")
 
@@ -288,12 +317,10 @@ context_providers:
         "use_pdf": {
             "type": "boolean",
             "default": False,
-            "internal": True,
         },
         "use_chroma": {
             "type": "boolean",
             "default": False,
-            "internal": True,
         },
     }
 
