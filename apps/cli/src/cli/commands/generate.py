@@ -288,15 +288,26 @@ OPENAI_MODEL={env_config['openai_model']}
                 raise typer.Exit(1)
             console.print(f"  [green]✓[/green] {module} package generated")
 
-    # Done!
+    # Done with generation!
     console.print()
     console.print("[bold green]✨ Workspace generation complete![/bold green]")
+
+    # Run uv sync to install dependencies
     console.print()
-    console.print("Next steps:")
-    console.print(f"  cd {target_display}")
-    console.print("  uv sync")
-    console.print("  # Configure your .env file")
-    console.print(f"  moon run {FRONTENDS[frontend_choice]}:dev")
+    console.print("[bold green]Step 5:[/bold green] Installing dependencies...")
+    if not run_command(["uv", "sync"], "install dependencies", cwd=target_path):
+        console.print("[yellow]Warning: uv sync failed. Run it manually.[/yellow]")
+
+    # Start the dev server
+    console.print()
+    console.print(f"[bold green]Step 6:[/bold green] Starting {frontend_choice} dev server...")
+    console.print()
+    console.print(f"[dim]Your app is at: {target_display}[/dim]")
+    console.print()
+
+    # Run dev server (this will block and show output)
+    dev_cmd = ["moon", "run", f"{FRONTENDS[frontend_choice]}:dev"]
+    subprocess.run(dev_cmd, cwd=target_path)
 
 
 if __name__ == "__main__":
