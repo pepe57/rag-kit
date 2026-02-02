@@ -156,7 +156,7 @@ def generate_app_template(app_name: str, source_dir: Path):
             "You are a friendly chatbot named Reflex. Respond in markdown.": "{{ system_prompt }}",
         })
 
-    # Phase 1: LibCST transformation for Python files
+    # Phase 1: LibCST transformation for Python files (handles string literals)
     python_files = list(target.rglob("*.py"))
     for py_file in python_files:
         # Skip context_loader.py - it should not be parameterized
@@ -172,6 +172,22 @@ def generate_app_template(app_name: str, source_dir: Path):
             console.print(f"  [green]✓[/green] LibCST: {py_file.name}")
         except Exception as e:
             console.print(f"  [yellow]⚠[/yellow] LibCST failed for {py_file.name}: {e}")
+
+    # Phase 1.5: Text-based replacement for import statements
+    # LibCST doesn't parameterize module names in imports, so we do a simple text replace
+    for py_file in python_files:
+        if py_file.name == "context_loader.py":
+            continue
+        code = py_file.read_text()
+        modified = code
+        for golden, tag in mappings.items():
+            # Replace in import statements (e.g., "from reflex_chat." -> "from {{ project_name }}.")
+            modified = modified.replace(f"from {golden}.", f"from {tag}.")
+            modified = modified.replace(f"import {golden}.", f"import {tag}.")
+            modified = modified.replace(f"import {golden}\n", f"import {tag}\n")
+        if modified != code:
+            py_file.write_text(modified)
+            console.print(f"  [green]✓[/green] Imports: {py_file.name}")
 
     # Phase 2: Parameterize pyproject.toml with conditional dependencies
     pyproject_path = target / "pyproject.toml"

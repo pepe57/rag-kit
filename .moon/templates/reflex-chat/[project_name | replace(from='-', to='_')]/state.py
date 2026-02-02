@@ -2,10 +2,14 @@ import os
 from typing import Any, TypedDict
 
 import reflex as rx
+from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 from context_loader import process_bytes
+
+# Load .env file
+load_dotenv()
 
 # Checking if the API keys are set properly
 if not os.getenv("OPENAI_API_KEY"):

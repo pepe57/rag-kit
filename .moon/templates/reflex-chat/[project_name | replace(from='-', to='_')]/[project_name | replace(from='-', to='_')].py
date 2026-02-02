@@ -2,7 +2,7 @@
 
 import reflex as rx
 
-from reflex_chat.components import chat, navbar
+from {{ project_name | replace(from='-', to='_') }}.components import chat, navbar
 
 
 def index() -> rx.Component:
