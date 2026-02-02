@@ -7,12 +7,6 @@
 
 RAG Facile provides a foundation for building RAG (Retrieval-Augmented Generation) applications in the French government, specifically using the [Albert API](https://albert.sites.beta.gouv.fr/). It is designed for exploratory greenfield projects.
 
-**One command gets you to a running RAG app:**
-
-```bash
-rf generate workspace my-rag-app
-```
-
 ## Quick Start
 
 ### 1. Install Prerequisites
@@ -42,7 +36,7 @@ rf --help
 
 ### 3. Generate Your Workspace
 
-Run the interactive workspace generator:
+Once installed, one command gets you to a running RAG app:
 
 ```bash
 rf generate workspace my-rag-app

@@ -25,9 +25,9 @@ def ensure_proto_and_moon() -> bool:
         console.print("[yellow]proto not found. Installing proto...[/yellow]")
         console.print()
 
-        # Install proto
+        # Install proto with --yes to skip interactive prompts
         result = subprocess.run(
-            ["sh", "-c", "curl -fsSL https://moonrepo.dev/install/proto.sh | bash"],
+            ["bash", "-c", "bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes"],
             capture_output=False,
         )
         if result.returncode != 0:
@@ -35,7 +35,7 @@ def ensure_proto_and_moon() -> bool:
                 "[red]Failed to install proto. Please install manually:[/red]"
             )
             console.print(
-                "[dim]curl -fsSL https://moonrepo.dev/install/proto.sh | bash[/dim]"
+                "[dim]bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes[/dim]"
             )
             return False
 
