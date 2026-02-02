@@ -113,7 +113,8 @@ fi
 # 5. Install rf CLI via uv
 echo ""
 echo "Installing RAG Facile CLI..."
-uv tool install rag-facile-cli --force --from git+https://github.com/etalab-ia/rag-facile.git#subdirectory=apps/cli
+BRANCH="${RAG_FACILE_BRANCH:-main}"
+uv tool install rag-facile-cli --force --from "git+https://github.com/etalab-ia/rag-facile.git@${BRANCH}#subdirectory=apps/cli"
 
 # 6. Verify and handle PATH
 echo ""
