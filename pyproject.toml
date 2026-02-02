@@ -26,7 +26,16 @@ dev = [
     "ruff>=0.14.14",
     "ty>=0.0.1",
     "pre-commit>=4.0.1",
+    "pytest>=8.0.0",
 ]
 
 [tool.uv.workspace]
 members = ["apps/*", "packages/*"]
+
+[tool.ty]
+exclude = [".moon/templates"]
+
+[tool.ty.rules]
+# Disable rules with false positives from metaprogramming (Reflex, Chainlit)
+call-non-callable = "ignore"
+possibly-missing-attribute = "ignore"
