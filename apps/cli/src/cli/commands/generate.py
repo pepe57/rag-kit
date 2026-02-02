@@ -1,6 +1,7 @@
 """Generate command - orchestrates workspace generation using Init + Patch architecture."""
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,43 @@ from rich.console import Console
 
 app = typer.Typer()
 console = Console()
+
+
+def ensure_proto_and_moon() -> bool:
+    """Ensure proto and moon are installed, installing them if needed."""
+    # Check if moon is available
+    if shutil.which("moon"):
+        return True
+
+    # Check if proto is available
+    if not shutil.which("proto"):
+        console.print("[yellow]proto not found. Installing proto (moonrepo toolchain manager)...[/yellow]")
+        console.print()
+
+        # Install proto
+        result = subprocess.run(
+            ["sh", "-c", "curl -fsSL https://moonrepo.dev/install/proto.sh | bash"],
+            capture_output=False,
+        )
+        if result.returncode != 0:
+            console.print("[red]Failed to install proto. Please install manually:[/red]")
+            console.print("[dim]curl -fsSL https://moonrepo.dev/install/proto.sh | bash[/dim]")
+            return False
+
+        console.print("[green]proto installed successfully![/green]")
+        console.print()
+
+    # Install moon via proto
+    console.print("[yellow]Installing moon via proto...[/yellow]")
+    result = subprocess.run(["proto", "install", "moon"], capture_output=False)
+    if result.returncode != 0:
+        console.print("[red]Failed to install moon. Please install manually:[/red]")
+        console.print("[dim]proto install moon[/dim]")
+        return False
+
+    console.print("[green]moon installed successfully![/green]")
+    console.print()
+    return True
 
 # Available frontends
 FRONTENDS = {
@@ -64,6 +102,10 @@ def workspace(
     2. Apply RAG Facile configuration
     3. Generate selected app and packages
     """
+    # 0. Ensure proto and moon are installed
+    if not ensure_proto_and_moon():
+        raise typer.Exit(1)
+
     # 1. Gather inputs interactively
     if not target:
         target = questionary.text(

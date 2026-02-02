@@ -17,15 +17,14 @@ rf generate workspace my-rag-app
 
 ### 1. Install Prerequisites
 
-Ensure you have `uv` and `moon` installed:
+Ensure you have `uv` installed:
 
 ```bash
 # Install uv (package manager)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install moon (monorepo manager)
-curl -fsSL https://moonrepo.dev/install/moon.sh | bash
 ```
+
+> **Note**: The CLI will automatically install `proto` and `moon` if needed.
 
 ### 2. Install the CLI
 
