@@ -1,15 +1,17 @@
 """Tests for the generate command."""
 
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from typer.testing import CliRunner
-
-from cli.commands.generate import get_templates_dir, run_command, app, FRONTENDS, MODULES
+from cli.commands.generate import (
+    FRONTENDS,
+    MODULES,
+    get_templates_dir,
+    run_command,
+)
 from cli.main import app as main_app
-
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
@@ -128,8 +130,8 @@ class TestWorkspaceCommand:
         mock_copytree = mocker.patch("shutil.copytree")
 
         # Mock yaml operations
-        mock_yaml_load = mocker.patch("yaml.safe_load", return_value={})
-        mock_yaml_dump = mocker.patch("yaml.dump")
+        mocker.patch("yaml.safe_load", return_value={})
+        mocker.patch("yaml.dump")
 
         return {
             "questionary": mock_q,
@@ -176,7 +178,9 @@ class TestWorkspaceCommand:
 
         # Check moon generate was called for sys-config and chainlit-chat
         calls = mock_generation["subprocess_run"].call_args_list
-        generate_calls = [c for c in calls if "moon" in c[0][0] and "generate" in c[0][0]]
+        generate_calls = [
+            c for c in calls if "moon" in c[0][0] and "generate" in c[0][0]
+        ]
         assert len(generate_calls) >= 2  # sys-config + app
 
     def test_workspace_with_force_flag(self, mock_generation, tmp_path):
@@ -211,7 +215,9 @@ class TestPathNormalization:
         mock_q.confirm.return_value.ask.return_value = False  # Abort early
 
         # Use a path under /private/tmp if on macOS
-        result = runner.invoke(main_app, ["generate", "workspace", "/private/tmp/test-app"])
+        result = runner.invoke(
+            main_app, ["generate", "workspace", "/private/tmp/test-app"]
+        )
 
         # Output should show /tmp not /private/tmp
         if "/private/tmp" in result.output:

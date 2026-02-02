@@ -66,7 +66,7 @@ def generate_sys_config():
     # Create template.yml
     template_yml = {
         "title": "System Configuration",
-        "description": "RAG Facile workspace configuration. Designed to patch moon init defaults.",
+        "description": "RAG Facile workspace config (patches moon init defaults).",
         "destination": ".",
         "variables": {
             "project_name": {
@@ -97,7 +97,7 @@ def generate_sys_config():
     (moon_dir / "workspace.yml").write_text(yaml.dump(workspace, sort_keys=False))
 
     # Create root pyproject.toml for uv workspace
-    pyproject = '''\
+    pyproject = """\
 [project]
 name = "{{ project_name }}"
 version = "0.1.0"
@@ -113,7 +113,7 @@ managed = true
 
 [tool.uv.workspace]
 members = ["apps/*", "packages/*"]
-'''
+"""
     (target / "pyproject.toml").write_text(pyproject)
 
     # Pin Python version for uv
@@ -145,16 +145,22 @@ def generate_app_template(app_name: str, source_dir: Path):
 
     # App-specific mappings
     if app_name == "chainlit-chat":
-        mappings.update({
-            "Chainlit Chat with OpenAI Functions Streaming": "{{ description }}",
-            "Welcome to Chainlit! 🚀🤖": "{{ welcome_message }}",
-            "You are a helpful assistant.": "{{ system_prompt }}",
-        })
+        mappings.update(
+            {
+                "Chainlit Chat with OpenAI Functions Streaming": "{{ description }}",
+                "Welcome to Chainlit! 🚀🤖": "{{ welcome_message }}",
+                "You are a helpful assistant.": "{{ system_prompt }}",
+            }
+        )
     elif app_name == "reflex-chat":
-        mappings.update({
-            "Reflex Chat Application": "{{ description }}",
-            "You are a friendly chatbot named Reflex. Respond in markdown.": "{{ system_prompt }}",
-        })
+        mappings.update(
+            {
+                "Reflex Chat Application": "{{ description }}",
+                "You are a friendly chatbot named Reflex. Respond in markdown.": (
+                    "{{ system_prompt }}"
+                ),
+            }
+        )
 
     # Phase 1: LibCST transformation for Python files (handles string literals)
     python_files = list(target.rglob("*.py"))
@@ -174,14 +180,14 @@ def generate_app_template(app_name: str, source_dir: Path):
             console.print(f"  [yellow]⚠[/yellow] LibCST failed for {py_file.name}: {e}")
 
     # Phase 1.5: Text-based replacement for import statements
-    # LibCST doesn't parameterize module names in imports, so we do a simple text replace
+    # LibCST doesn't parameterize module names in imports, so we do text replace
     for py_file in python_files:
         if py_file.name == "context_loader.py":
             continue
         code = py_file.read_text()
         modified = code
         for golden, tag in mappings.items():
-            # Replace in import statements (e.g., "from reflex_chat." -> "from {{ project_name }}.")
+            # Replace in import statements
             modified = modified.replace(f"from {golden}.", f"from {tag}.")
             modified = modified.replace(f"import {golden}.", f"import {tag}.")
             modified = modified.replace(f"import {golden}\n", f"import {tag}\n")
@@ -198,24 +204,21 @@ def generate_app_template(app_name: str, source_dir: Path):
         # Replace description
         if app_name == "chainlit-chat":
             content = content.replace(
-                '"Chainlit Chat with OpenAI Functions Streaming"',
-                '"{{ description }}"'
+                '"Chainlit Chat with OpenAI Functions Streaming"', '"{{ description }}"'
             )
         elif app_name == "reflex-chat":
             content = content.replace(
-                '"Reflex Chat Application"',
-                '"{{ description }}"'
+                '"Reflex Chat Application"', '"{{ description }}"'
             )
             # Also fix setuptools include pattern
             content = content.replace(
                 f'["{slug_underscore}*"]',
-                '["{{ project_name | replace(from=\'-\', to=\'_\') }}*"]'
+                "[\"{{ project_name | replace(from='-', to='_') }}*\"]",
             )
 
         # Make pdf-context dependency conditional
         content = content.replace(
-            '    "pdf-context",',
-            '{%- if use_pdf %}\n    "pdf-context",\n{%- endif %}'
+            '    "pdf-context",', '{%- if use_pdf %}\n    "pdf-context",\n{%- endif %}'
         )
 
         # Update uv sources for conditional deps
@@ -268,7 +271,9 @@ context_providers:
         md_path = target / "chainlit.md"
         if md_path.exists():
             content = md_path.read_text()
-            content = content.replace("# Welcome to Chainlit! 🚀🤖", "# {{ welcome_message }}")
+            content = content.replace(
+                "# Welcome to Chainlit! 🚀🤖", "# {{ welcome_message }}"
+            )
             md_path.write_text(content)
             console.print("  [green]✓[/green] chainlit.md parameterized")
 
@@ -279,7 +284,7 @@ context_providers:
             content = rxconfig_path.read_text()
             content = content.replace(
                 'app_name="reflex_chat"',
-                "app_name=\"{{ project_name | replace(from='-', to='_') }}\""
+                "app_name=\"{{ project_name | replace(from='-', to='_') }}\"",
             )
             rxconfig_path.write_text(content)
             console.print("  [green]✓[/green] rxconfig.py parameterized")
@@ -326,8 +331,9 @@ context_providers:
         },
         "system_prompt": {
             "type": "string",
-            "default": "You are a helpful assistant." if app_name == "chainlit-chat"
-                       else "You are a friendly chatbot named Reflex. Respond in markdown.",
+            "default": "You are a helpful assistant."
+            if app_name == "chainlit-chat"
+            else "You are a friendly chatbot named Reflex. Respond in markdown.",
             "prompt": "Initial system prompt for the assistant",
         },
         "use_pdf": {
@@ -441,7 +447,13 @@ def main():
     parser = argparse.ArgumentParser(description="Generate RAG Facile templates")
     parser.add_argument(
         "--template",
-        choices=["sys-config", "chainlit-chat", "reflex-chat", "pdf-context", "chroma-context"],
+        choices=[
+            "sys-config",
+            "chainlit-chat",
+            "reflex-chat",
+            "pdf-context",
+            "chroma-context",
+        ],
         help="Generate a specific template",
     )
     parser.add_argument(
@@ -461,7 +473,11 @@ def main():
     templates_to_generate = []
     if args.all:
         templates_to_generate = [
-            "sys-config", "chainlit-chat", "reflex-chat", "pdf-context", "chroma-context"
+            "sys-config",
+            "chainlit-chat",
+            "reflex-chat",
+            "pdf-context",
+            "chroma-context",
         ]
     else:
         templates_to_generate = [args.template]
@@ -475,7 +491,9 @@ def main():
         elif template == "reflex-chat":
             generate_app_template("reflex-chat", REPO_ROOT / "apps" / "reflex-chat")
         elif template == "pdf-context":
-            generate_package_template("pdf-context", REPO_ROOT / "packages" / "pdf-context")
+            generate_package_template(
+                "pdf-context", REPO_ROOT / "packages" / "pdf-context"
+            )
         elif template == "chroma-context":
             generate_chroma_placeholder()
 

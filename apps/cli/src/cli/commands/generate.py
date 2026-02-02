@@ -1,9 +1,8 @@
-"""Generate command - orchestrates workspace generation using Init + Patch architecture."""
+"""Generate command - orchestrates workspace generation using Init + Patch."""
 
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -23,7 +22,7 @@ def ensure_proto_and_moon() -> bool:
 
     # Check if proto is available
     if not shutil.which("proto"):
-        console.print("[yellow]proto not found. Installing proto (moonrepo toolchain manager)...[/yellow]")
+        console.print("[yellow]proto not found. Installing proto...[/yellow]")
         console.print()
 
         # Install proto
@@ -32,8 +31,12 @@ def ensure_proto_and_moon() -> bool:
             capture_output=False,
         )
         if result.returncode != 0:
-            console.print("[red]Failed to install proto. Please install manually:[/red]")
-            console.print("[dim]curl -fsSL https://moonrepo.dev/install/proto.sh | bash[/dim]")
+            console.print(
+                "[red]Failed to install proto. Please install manually:[/red]"
+            )
+            console.print(
+                "[dim]curl -fsSL https://moonrepo.dev/install/proto.sh | bash[/dim]"
+            )
             return False
 
         console.print("[green]proto installed successfully![/green]")
@@ -50,6 +53,7 @@ def ensure_proto_and_moon() -> bool:
     console.print("[green]moon installed successfully![/green]")
     console.print()
     return True
+
 
 # Available frontends
 FRONTENDS = {
@@ -161,8 +165,12 @@ def workspace(
     # Prompt for environment configuration (use current env as defaults)
     console.print()
     console.print("[bold blue]Environment Configuration[/bold blue]")
-    console.print("[dim]These values will be saved to .env in your app directory.[/dim]")
-    console.print("[dim]Get an API key at https://albert.sites.beta.gouv.fr/access/[/dim]")
+    console.print(
+        "[dim]These values will be saved to .env in your app directory.[/dim]"
+    )
+    console.print(
+        "[dim]Get an API key at https://albert.sites.beta.gouv.fr/access/[/dim]"
+    )
     console.print()
 
     env_config = {}
@@ -195,7 +203,9 @@ def workspace(
     console.print("[bold blue]Configuration Summary[/bold blue]")
     console.print(f"  Target: {target_display}")
     console.print(f"  Frontend: {frontend_choice}")
-    console.print(f"  Modules: {', '.join(selected_modules) if selected_modules else 'None'}")
+    console.print(
+        f"  Modules: {', '.join(selected_modules) if selected_modules else 'None'}"
+    )
     console.print(f"  API: {env_config['openai_base_url']}")
     console.print()
 
@@ -207,8 +217,12 @@ def workspace(
     # Get templates directory
     templates_dir = get_templates_dir()
     if not templates_dir.exists():
-        console.print(f"[red]Error: Templates directory not found at {templates_dir}[/red]")
-        console.print("[dim]Make sure you're running from within the rag-facile repository.[/dim]")
+        console.print(
+            f"[red]Error: Templates directory not found at {templates_dir}[/red]"
+        )
+        console.print(
+            "[dim]Make sure you're running from within the rag-facile repository.[/dim]"
+        )
         raise typer.Exit(1)
 
     # 2. Bootstrap with moon init
@@ -228,7 +242,9 @@ def workspace(
 
     # 3. Apply system configuration patch
     console.print()
-    console.print("[bold green]Step 2:[/bold green] Applying RAG Facile configuration...")
+    console.print(
+        "[bold green]Step 2:[/bold green] Applying RAG Facile configuration..."
+    )
 
     # Copy templates to target (moon generate expects templates in the workspace)
     target_templates = target_path / ".moon" / "templates"
@@ -239,7 +255,13 @@ def workspace(
     import shutil
 
     console.print(f"[dim]Copying templates from {templates_dir}[/dim]")
-    for template_name in ["sys-config", "chainlit-chat", "reflex-chat", "pdf-context", "chroma-context"]:
+    for template_name in [
+        "sys-config",
+        "chainlit-chat",
+        "reflex-chat",
+        "pdf-context",
+        "chroma-context",
+    ]:
         src = templates_dir / template_name
         dst = target_templates / template_name
         if src.exists():
@@ -255,6 +277,7 @@ def workspace(
     workspace_yml = target_path / ".moon" / "workspace.yml"
     if workspace_yml.exists():
         import yaml
+
         with open(workspace_yml) as f:
             config = yaml.safe_load(f) or {}
         if "generator" not in config:
@@ -263,7 +286,7 @@ def workspace(
                 yaml.dump(config, f, default_flow_style=False)
             console.print("[dim]  ✓ Added generator.templates config[/dim]")
 
-    # Run moon generate for sys-config from within the target (DEST is . since we're in the target)
+    # Run moon generate for sys-config (DEST is . since we're in the target)
     sys_config_cmd = ["moon", "generate", "sys-config", ".", "--defaults", "--force"]
     if not run_command(sys_config_cmd, "apply system config", cwd=target_path):
         raise typer.Exit(1)
@@ -271,11 +294,12 @@ def workspace(
 
     # 4. Generate the app with feature flags
     console.print()
-    console.print(f"[bold green]Step 3:[/bold green] Generating {frontend_choice} app...")
+    console.print(
+        f"[bold green]Step 3:[/bold green] Generating {frontend_choice} app..."
+    )
 
     frontend_template = FRONTENDS[frontend_choice]
-    # moon generate <NAME> --defaults --force [-- --bool_flag ...]
-    # Don't pass DEST - let the template.yml destination be used (e.g., apps/chainlit-chat)
+    # Don't pass DEST - let template.yml destination be used
     app_cmd = ["moon", "generate", frontend_template, "--defaults"]
     if force:
         app_cmd.append("--force")
@@ -302,12 +326,12 @@ def workspace(
     app_dir = target_path / "apps" / frontend_template
     env_file = app_dir / ".env"
     env_content = f"""\
-OPENAI_API_KEY={env_config['openai_api_key']}
-OPENAI_BASE_URL={env_config['openai_base_url']}
-OPENAI_MODEL={env_config['openai_model']}
+OPENAI_API_KEY={env_config["openai_api_key"]}
+OPENAI_BASE_URL={env_config["openai_base_url"]}
+OPENAI_MODEL={env_config["openai_model"]}
 """
     env_file.write_text(env_content)
-    console.print(f"[green]✓[/green] Created .env file")
+    console.print("[green]✓[/green] Created .env file")
 
     # 5. Generate selected packages
     if selected_modules:
@@ -317,13 +341,15 @@ OPENAI_MODEL={env_config['openai_model']}
         for module in selected_modules:
             module_info = MODULES[module]
             if not module_info["available"]:
-                console.print(f"[yellow]⚠[/yellow] {module} is not yet available, skipping...")
+                console.print(
+                    f"[yellow]⚠[/yellow] {module} is not yet available, skipping..."
+                )
                 continue
 
-            template_name = module_info["template"]
+            template_name = str(module_info["template"])
             console.print(f"  Generating {module}...")
             # Don't pass DEST - let the template.yml destination be used
-            pkg_cmd = ["moon", "generate", template_name, "--defaults"]
+            pkg_cmd: list[str] = ["moon", "generate", template_name, "--defaults"]
             if force:
                 pkg_cmd.append("--force")
             if not run_command(pkg_cmd, f"generate {template_name}", cwd=target_path):
@@ -342,7 +368,9 @@ OPENAI_MODEL={env_config['openai_model']}
 
     # Start the dev server
     console.print()
-    console.print(f"[bold green]Step 6:[/bold green] Starting {frontend_choice} dev server...")
+    console.print(
+        f"[bold green]Step 6:[/bold green] Starting {frontend_choice} dev server..."
+    )
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
     console.print()
