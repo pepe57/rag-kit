@@ -123,6 +123,10 @@ members = ["apps/*", "packages/*"]
     justfile = """\
 # {{ project_name }} - RAG Facile project
 
+# Display available commands
+default:
+    @just --list
+
 # Run the application (all apps with dev task)
 dev:
     moon run :dev
