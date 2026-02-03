@@ -6,10 +6,10 @@ default:
 
 # Run all apps or a specific app (e.g., just run or just run chainlit-chat)
 run app="":
-    @if [ -z "{{ app }}" ]; then \
+    @if [ -z "{{ "{{ app }}" }}" ]; then \
         moon run :dev; \
     else \
-        moon run {{ app }}:dev; \
+        moon run {{ "{{ app }}" }}:dev; \
     fi
 
 # Format code (write changes)
