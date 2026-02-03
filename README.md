@@ -193,6 +193,13 @@ just run                    # Run all apps
 | `just sync` | Sync dependencies with uv |
 | `just add <template>` | Add a new app from template |
 
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Evaluation Guide](docs/evaluation.md) | How to evaluate your RAG application |
+| [Contributing Guide](CONTRIBUTING.md) | Architecture overview and development setup |
+
 ## Contributing
 
 Want to contribute to RAG Facile itself? See [CONTRIBUTING.md](CONTRIBUTING.md) for the architecture overview and development setup.
