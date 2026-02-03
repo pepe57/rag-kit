@@ -1,7 +1,7 @@
 import typer
 from rich.console import Console
 
-from cli.commands import generate
+from cli.commands import eval, generate
 
 console = Console()
 
@@ -20,6 +20,7 @@ console.print(BANNER)
 app = typer.Typer(add_completion=False)
 
 app.add_typer(generate.app, name="generate")
+app.add_typer(eval.app, name="eval")
 
 
 @app.command()
