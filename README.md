@@ -116,8 +116,8 @@ just run chainlit-chat      # Run a specific app
 
 | Command | Description |
 |---------|-------------|
-| `just run` | Run all apps with a dev task |
-| `just run <name>` | Run a specific app (e.g., `chainlit-chat`) |
+| `just run` | Run all apps |
+| `just run <name>` | Run a specific app (e.g., `just run chainlit-chat`) |
 | `just format` | Format code with ruff |
 | `just lint` | Run linter |
 | `just check` | Run all checks (format, lint, type-check) |
