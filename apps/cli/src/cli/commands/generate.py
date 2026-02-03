@@ -45,7 +45,11 @@ def install_proto() -> bool:
     """Install proto using the official installer."""
     console.print("[yellow]Installing proto...[/yellow]")
     result = subprocess.run(
-        ["bash", "-c", "bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes"],
+        [
+            "bash",
+            "-c",
+            "bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --yes",
+        ],
         capture_output=False,
     )
     if result.returncode != 0:

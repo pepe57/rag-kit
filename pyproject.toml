@@ -40,4 +40,10 @@ possibly-missing-attribute = "ignore"
 
 [tool.ruff]
 # Exclude moon templates (contain Jinja2 syntax, not valid Python/TOML)
+extend-exclude = [".moon/templates", "apps/cli/src/cli/templates"]
+
+[tool.ruff.lint]
+exclude = [".moon/templates", "apps/cli/src/cli/templates"]
+
+[tool.ruff.format]
 exclude = [".moon/templates", "apps/cli/src/cli/templates"]
