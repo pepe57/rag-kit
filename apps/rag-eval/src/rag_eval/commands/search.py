@@ -1,12 +1,13 @@
-"""Search for evaluation datasets."""
+"""Search for evaluation datasets using HuggingFace Hub API."""
 
 import os
+from dataclasses import dataclass
 from typing import Annotated, Optional
 
-import httpx
 import typer
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from huggingface_hub import HfApi, DatasetInfo
+from huggingface_hub.utils import HfHubHTTPError
 from rich.console import Console
 from rich.table import Table
 
@@ -16,78 +17,68 @@ console = Console()
 app = typer.Typer(help="Search for evaluation datasets")
 
 
-class HFDataset(BaseModel):
-    """HuggingFace dataset metadata."""
+@dataclass
+class DatasetResult:
+    """Simplified dataset result for display."""
 
     id: str
-    author: Optional[str] = None
-    downloads: int = 0
-    likes: int = 0
-    tags: list[str] = []
-    description: Optional[str] = None
+    author: str | None
+    downloads: int
+    likes: int
+    tags: list[str]
 
     @property
     def url(self) -> str:
         return f"https://huggingface.co/datasets/{self.id}"
 
+    @classmethod
+    def from_dataset_info(cls, info: DatasetInfo) -> "DatasetResult":
+        """Create from HuggingFace DatasetInfo."""
+        return cls(
+            id=info.id,
+            author=info.author,
+            downloads=info.downloads or 0,
+            likes=info.likes or 0,
+            tags=list(info.tags) if info.tags else [],
+        )
+
 
 def search_huggingface(
-    query: str,
+    query: str | None = None,
     *,
     author: str | None = None,
     limit: int = 20,
-) -> list[HFDataset]:
-    """Search HuggingFace for datasets matching the query.
+    sort: str = "downloads",
+) -> list[DatasetResult]:
+    """Search HuggingFace for datasets using the official Hub API.
 
     Args:
-        query: Search query string
+        query: Search query string (optional)
         author: Filter by author/organization (e.g., "AgentPublic")
         limit: Maximum number of results to return
+        sort: Sort order ("downloads", "likes", "created", "modified")
 
     Returns:
         List of matching datasets
     """
-    hf_token = os.getenv("HF_TOKEN")
+    api = HfApi()
 
-    headers = {}
-    if hf_token:
-        headers["Authorization"] = f"Bearer {hf_token}"
+    # list_datasets returns an iterator (sorting is always descending)
+    datasets_iter = api.list_datasets(
+        search=query if query else None,
+        author=author,
+        sort=sort,
+        limit=limit,
+    )
 
-    params: dict[str, str | int] = {
-        "search": query,
-        "limit": limit,
-        "full": "true",  # Get full metadata
-    }
+    results = []
+    for info in datasets_iter:
+        results.append(DatasetResult.from_dataset_info(info))
 
-    if author:
-        params["author"] = author
-
-    with httpx.Client(timeout=30.0) as client:
-        response = client.get(
-            "https://huggingface.co/api/datasets",
-            params=params,
-            headers=headers,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-    datasets = []
-    for item in data:
-        datasets.append(
-            HFDataset(
-                id=item.get("id", ""),
-                author=item.get("author"),
-                downloads=item.get("downloads", 0),
-                likes=item.get("likes", 0),
-                tags=item.get("tags", []),
-                description=item.get("description"),
-            )
-        )
-
-    return datasets
+    return results
 
 
-def display_datasets(datasets: list[HFDataset], title: str = "Search Results"):
+def display_datasets(datasets: list[DatasetResult], title: str = "Search Results"):
     """Display datasets in a rich table."""
     if not datasets:
         console.print("[yellow]No datasets found.[/yellow]")
@@ -101,7 +92,7 @@ def display_datasets(datasets: list[HFDataset], title: str = "Search Results"):
     table.add_column("Dataset ID", style="green", no_wrap=True)
     table.add_column("Downloads", justify="right", style="yellow")
     table.add_column("Likes", justify="right", style="magenta")
-    table.add_column("Tags", style="dim")
+    table.add_column("Tags", style="dim", max_width=40)
 
     for ds in datasets:
         # Truncate tags for display
@@ -111,7 +102,7 @@ def display_datasets(datasets: list[HFDataset], title: str = "Search Results"):
 
         table.add_row(
             ds.id,
-            str(ds.downloads),
+            f"{ds.downloads:,}",
             str(ds.likes),
             tags_str,
         )
@@ -131,6 +122,10 @@ def search_hf(
         int,
         typer.Option("--limit", "-n", help="Maximum number of results"),
     ] = 20,
+    sort: Annotated[
+        str,
+        typer.Option("--sort", "-s", help="Sort by: downloads, likes, created, modified"),
+    ] = "downloads",
 ):
     """Search HuggingFace for evaluation datasets.
 
@@ -138,6 +133,7 @@ def search_hf(
         rag-eval search hf "french QA"
         rag-eval search hf "RAG evaluation" --author AgentPublic
         rag-eval search hf "legislation" -a AgentPublic -n 10
+        rag-eval search hf "french" --sort likes
     """
     hf_token = os.getenv("HF_TOKEN")
     if not hf_token:
@@ -148,8 +144,8 @@ def search_hf(
 
     with console.status(f"[cyan]Searching HuggingFace for '{query}'..."):
         try:
-            datasets = search_huggingface(query, author=author, limit=limit)
-        except httpx.HTTPError as e:
+            datasets = search_huggingface(query, author=author, limit=limit, sort=sort)
+        except HfHubHTTPError as e:
             console.print(f"[red]Error searching HuggingFace: {e}[/red]")
             raise typer.Exit(1)
 
@@ -180,16 +176,14 @@ def search_agent_public(
         rag-eval search agent-public
         rag-eval search agent-public "legislation"
     """
-    search_query = query or ""
-
     with console.status("[cyan]Searching AgentPublic datasets..."):
         try:
             datasets = search_huggingface(
-                search_query,
+                query,
                 author="AgentPublic",
                 limit=limit,
             )
-        except httpx.HTTPError as e:
+        except HfHubHTTPError as e:
             console.print(f"[red]Error searching HuggingFace: {e}[/red]")
             raise typer.Exit(1)
 
@@ -221,16 +215,14 @@ def search_comparia(
         rag-eval search comparia
         rag-eval search comparia "votes"
     """
-    search_query = query or ""
-
     with console.status("[cyan]Searching Compar:IA datasets..."):
         try:
             datasets = search_huggingface(
-                search_query,
+                query,
                 author="ministere-culture",
                 limit=limit,
             )
-        except httpx.HTTPError as e:
+        except HfHubHTTPError as e:
             console.print(f"[red]Error searching HuggingFace: {e}[/red]")
             raise typer.Exit(1)
 
