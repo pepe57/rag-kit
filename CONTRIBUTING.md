@@ -17,6 +17,18 @@ proto install moon uv
 
 The installer includes [just](https://github.com/casey/just) (task runner) automatically. No additional setup needed!
 
+### System Dependencies
+
+For Reflex frontend support, you need `unzip`. On Ubuntu/Debian:
+```bash
+sudo apt-get install unzip
+```
+
+On macOS:
+```bash
+brew install unzip
+```
+
 ### 2. Clone and setup
 
 ```bash

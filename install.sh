@@ -16,7 +16,7 @@ echo ""
 # Install prerequisites on Linux if needed
 if [[ "$(uname)" == "Linux" ]] && command -v apt-get &> /dev/null; then
     missing=""
-    for cmd in git curl xz; do
+    for cmd in git curl xz unzip; do
         if ! command -v "$cmd" &> /dev/null; then
             missing="$missing $cmd"
         fi
@@ -26,9 +26,9 @@ if [[ "$(uname)" == "Linux" ]] && command -v apt-get &> /dev/null; then
         echo "Installing prerequisites:$missing"
         # Use sudo if not root
         if [[ $EUID -eq 0 ]]; then
-            apt-get update && apt-get install -y git curl xz-utils
+            apt-get update && apt-get install -y git curl xz-utils unzip
         else
-            sudo apt-get update && sudo apt-get install -y git curl xz-utils
+            sudo apt-get update && sudo apt-get install -y git curl xz-utils unzip
         fi
         echo ""
     fi

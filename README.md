@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.s
 source ~/.bashrc  # or restart your terminal
 ```
 
-> **Note**: On Ubuntu/Debian, the installer will automatically install prerequisites (git, curl, xz-utils) if needed.
+> **Note**: On Ubuntu/Debian, the installer will automatically install prerequisites (git, curl, xz-utils, unzip) if needed.
 
 Verify the installation:
 
