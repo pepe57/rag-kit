@@ -37,3 +37,7 @@ members = ["apps/*", "packages/*"]
 # Disable rules with false positives from metaprogramming (Reflex, Chainlit)
 call-non-callable = "ignore"
 possibly-missing-attribute = "ignore"
+
+[tool.ruff]
+# Exclude moon templates (contain Jinja2 syntax, not valid Python/TOML)
+exclude = [".moon/templates", "apps/cli/src/cli/templates"]
