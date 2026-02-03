@@ -1,12 +1,25 @@
 """List known dataset sources for RAG evaluation."""
 
+from typing import TypedDict
+
 from rich.console import Console
 from rich.table import Table
 
 console = Console()
 
+
+class DatasetSource(TypedDict):
+    """Type definition for a dataset source."""
+
+    name: str
+    type: str
+    url: str
+    description: str
+    datasets: list[str]
+
+
 # Known dataset sources for French government RAG evaluation
-KNOWN_SOURCES = [
+KNOWN_SOURCES: list[DatasetSource] = [
     {
         "name": "AgentPublic",
         "type": "HuggingFace Organization",
