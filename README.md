@@ -23,7 +23,7 @@ RAG Facile provides a foundation for building RAG (Retrieval-Augmented Generatio
 One command installs the entire toolchain (proto, moon, uv) and the CLI:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh | bash
 source ~/.bashrc  # or restart your terminal
 ```
 
@@ -77,7 +77,7 @@ Your app will open in the browser, ready to use!
 To upgrade to the latest version, re-run the installer:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh)
+curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh | bash
 ```
 
 ## Generated Workspace Structure
