@@ -64,7 +64,9 @@ class AlbertApiProvider:
             document_paths: List of paths to documents (PDF, MD, TXT)
                            PDFs are automatically converted to markdown text.
         """
-        logger.info(f"Starting document upload to Albert API ({len(document_paths)} documents)")
+        logger.info(
+            f"Starting document upload to Albert API ({len(document_paths)} documents)"
+        )
         for doc_path in document_paths:
             logger.debug(f"  - {doc_path}")
 
@@ -97,7 +99,9 @@ class AlbertApiProvider:
 
         # Upload each processed document
         for i, doc_path in enumerate(processed_paths, 1):
-            logger.info(f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}")
+            logger.info(
+                f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}"
+            )
             with open(doc_path, "rb") as f:
                 # Determine MIME type based on file extension
                 mime_types = {
@@ -107,7 +111,9 @@ class AlbertApiProvider:
                 }
                 ext = Path(doc_path).suffix.lower()
                 mime_type = mime_types.get(ext, "application/octet-stream")
-                logger.debug(f"  MIME type: {mime_type}, Size: {Path(doc_path).stat().st_size} bytes")
+                logger.debug(
+                    f"  MIME type: {mime_type}, Size: {Path(doc_path).stat().st_size} bytes"
+                )
 
                 # Send file and collection in multipart form data
                 files = {
@@ -180,7 +186,9 @@ class AlbertApiProvider:
                 yield from self._process_line(buffer, seen_samples)
 
             logger.info(f"Completed Albert generation")
-            logger.debug(f"Total response ({len(total_response)} chars):\n{total_response}\n")
+            logger.debug(
+                f"Total response ({len(total_response)} chars):\n{total_response}\n"
+            )
         except Exception as e:
             logger.error(f"LLM generation failed: {e}", exc_info=True)
             raise RuntimeError(f"LLM generation failed: {e}") from e

@@ -51,7 +51,9 @@ class LettaProvider:
             document_paths: List of paths to documents (PDF, MD, TXT)
                            PDFs are automatically converted to markdown text.
         """
-        logger.info(f"Starting document upload to Letta Cloud ({len(document_paths)} documents)")
+        logger.info(
+            f"Starting document upload to Letta Cloud ({len(document_paths)} documents)"
+        )
         for doc_path in document_paths:
             logger.debug(f"  - {doc_path}")
 
@@ -69,7 +71,9 @@ class LettaProvider:
 
         # Upload each processed document
         for i, doc_path in enumerate(processed_paths, 1):
-            logger.info(f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}")
+            logger.info(
+                f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}"
+            )
             with open(doc_path, "rb") as f:
                 self.client.folders.files.upload(file=f, folder_id=folder.id)
                 logger.debug(f"  Upload successful")
@@ -132,7 +136,9 @@ class LettaProvider:
             yield from self._process_line(buffer, seen_samples)
 
         logger.info(f"Completed Letta generation")
-        logger.debug(f"Total response ({len(total_response)} chars):\n{total_response}\n")
+        logger.debug(
+            f"Total response ({len(total_response)} chars):\n{total_response}\n"
+        )
 
     def _process_line(
         self, line: str, seen_samples: set[str]
