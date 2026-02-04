@@ -4,10 +4,15 @@ Uses Letta Cloud's agent API to generate synthetic Q/A pairs.
 """
 
 import json
+import logging
 from collections.abc import Iterator
 from datetime import datetime, timezone
+from pathlib import Path
 
+from .document_preprocessor import DocumentPreprocessor
 from .schema import GeneratedSample
+
+logger = logging.getLogger(__name__)
 
 
 class LettaProvider:
@@ -36,23 +41,42 @@ class LettaProvider:
         self.folder_id: str | None = None
         self.conversation_id: str | None = None
 
+        # Initialize document preprocessor for PDF extraction
+        self.preprocessor = DocumentPreprocessor()
+
     def upload_documents(self, document_paths: list[str]) -> None:
         """Upload documents to Letta Cloud and attach to agent.
 
         Args:
-            document_paths: List of paths to documents
+            document_paths: List of paths to documents (PDF, MD, TXT)
+                           PDFs are automatically converted to markdown text.
         """
+        logger.info(
+            f"Starting document upload to Letta Cloud ({len(document_paths)} documents)"
+        )
+        for doc_path in document_paths:
+            logger.debug(f"  - {doc_path}")
+
+        # Preprocess documents (extract PDFs to text)
+        processed_paths = self.preprocessor.process_documents(document_paths)
+        logger.info(f"Preprocessed {len(processed_paths)} documents")
+
         # Create a unique folder for this run
         folder_name = (
             f"data_foundry_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
         )
         folder = self.client.folders.create(name=folder_name)
         self.folder_id = folder.id
+        logger.info(f"Created Letta folder: {self.folder_id} ({folder_name})")
 
-        # Upload each document
-        for doc_path in document_paths:
+        # Upload each processed document
+        for i, doc_path in enumerate(processed_paths, 1):
+            logger.info(
+                f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}"
+            )
             with open(doc_path, "rb") as f:
                 self.client.folders.files.upload(file=f, folder_id=folder.id)
+                logger.debug("  Upload successful")
 
         # Attach folder to the agent
         self.client.agents.folders.attach(
@@ -71,9 +95,12 @@ class LettaProvider:
         # Create a new conversation for this run
         conversation = self.client.conversations.create(agent_id=self.agent_id)
         self.conversation_id = conversation.id
+        logger.info(f"Created Letta conversation: {self.conversation_id}")
 
         # Build the generation prompt
         prompt = self._build_prompt(num_samples)
+        logger.debug(f"Generation prompt ({len(prompt)} chars):\n{prompt}\n")
+        logger.info("Sending prompt to Letta agent...")
 
         # Stream the response
         stream = self.client.conversations.messages.create(
@@ -86,12 +113,14 @@ class LettaProvider:
         # re-parsing the entire response on each chunk)
         seen_samples: set[str] = set()
         buffer = ""
+        total_response = ""
 
         for msg in stream:
             if hasattr(msg, "message_type") and msg.message_type == "assistant_message":
                 content = (
                     msg.content if isinstance(msg.content, str) else str(msg.content)
                 )
+                total_response += content
                 buffer += content
 
                 # Split into lines, keeping the last (possibly incomplete) line
@@ -106,6 +135,11 @@ class LettaProvider:
         if buffer:
             yield from self._process_line(buffer, seen_samples)
 
+        logger.info("Completed Letta generation")
+        logger.debug(
+            f"Total response ({len(total_response)} chars):\n{total_response}\n"
+        )
+
     def _process_line(
         self, line: str, seen_samples: set[str]
     ) -> Iterator[GeneratedSample]:
@@ -117,7 +151,7 @@ class LettaProvider:
                 yield sample
 
     def cleanup(self) -> None:
-        """Detach and delete folder from Letta Cloud."""
+        """Detach and delete folder from Letta Cloud and clean up temporary files."""
         if self.folder_id:
             try:
                 self.client.agents.folders.detach(
@@ -131,9 +165,20 @@ class LettaProvider:
             except Exception:
                 pass  # Non-critical
 
+        # Clean up temporary files created during preprocessing
+        try:
+            self.preprocessor.cleanup()
+        except Exception:
+            pass  # Non-critical
+
     def _build_prompt(self, num_samples: int) -> str:
         """Build the generation prompt for the agent."""
-        return f"""Generate {num_samples} Question/Answer pairs from the uploaded documents.
+        return f"""⚠️ AUTOMATED CONVERSATION - STRICT OUTPUT FORMAT REQUIRED ⚠️
+
+This is an automated system that parses your response programmatically.
+You MUST follow the output format exactly - any deviation will break the system.
+
+Generate {num_samples} Question/Answer pairs from the uploaded documents.
 
 Requirements:
 - Questions and answers must be in French
@@ -141,7 +186,10 @@ Requirements:
 - Ensure diversity - avoid similar questions about the same topics
 - Self-critique each pair for quality before outputting
 
-Return each sample as a JSON object on its own line with this exact structure:
+🔴 CRITICAL OUTPUT FORMAT 🔴
+Return ONLY valid JSONL with NO additional text, comments, explanations, or preamble.
+Do not output anything before the first JSON object or after the last JSON object.
+Each line must be a complete, valid JSON object with this exact structure:
 {{
   "user_input": "Question in French?",
   "retrieved_contexts": ["The exact text passage that answers the question..."],
@@ -153,7 +201,7 @@ Return each sample as a JSON object on its own line with this exact structure:
   }}
 }}
 
-Start generating now. Output each JSON sample on its own line as you generate them."""
+NOW OUTPUT ONLY THE JSONL - NO PREAMBLE, NO EXPLANATIONS, NO TEXT BEFORE OR AFTER."""
 
     def _extract_samples(self, line: str) -> Iterator[GeneratedSample]:
         """Extract JSON sample from a single line."""

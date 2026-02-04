@@ -2325,9 +2325,11 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "letta-client" },
     { name = "libcst" },
+    { name = "pypdf" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "questionary" },
+    { name = "requests" },
     { name = "rich" },
     { name = "typer" },
 ]
@@ -2344,9 +2346,11 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=1.3.0" },
     { name = "letta-client", specifier = ">=0.1.0" },
     { name = "libcst", specifier = ">=1.8.6" },
+    { name = "pypdf", specifier = ">=5.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "questionary", specifier = ">=2.0.0" },
+    { name = "requests", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "typer", specifier = ">=0.12.0" },
 ]
