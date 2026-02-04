@@ -82,23 +82,37 @@ class LettaProvider:
         )
 
         # Parse samples from the streaming response
+        # Use a buffer to process only complete lines (more efficient than
+        # re-parsing the entire response on each chunk)
         seen_samples: set[str] = set()
-        current_response = ""
+        buffer = ""
 
         for msg in stream:
             if hasattr(msg, "message_type") and msg.message_type == "assistant_message":
                 content = (
                     msg.content if isinstance(msg.content, str) else str(msg.content)
                 )
-                current_response += content
+                buffer += content
 
-                # Try to extract JSON samples
-                for sample in self._extract_samples(current_response):
-                    # Deduplicate by user_input
-                    sample_key = sample.user_input
-                    if sample_key not in seen_samples:
-                        seen_samples.add(sample_key)
-                        yield sample
+                # Split into lines, keeping the last (possibly incomplete) line
+                lines = buffer.split("\n")
+                buffer = lines.pop()  # Keep incomplete line in buffer
+
+                # Process complete lines
+                for line in lines:
+                    for sample in self._extract_samples(line):
+                        sample_key = sample.user_input
+                        if sample_key not in seen_samples:
+                            seen_samples.add(sample_key)
+                            yield sample
+
+        # Process any remaining content in the buffer
+        if buffer:
+            for sample in self._extract_samples(buffer):
+                sample_key = sample.user_input
+                if sample_key not in seen_samples:
+                    seen_samples.add(sample_key)
+                    yield sample
 
     def cleanup(self) -> None:
         """Detach and delete folder from Letta Cloud."""
@@ -139,16 +153,15 @@ Return each sample as a JSON object on its own line with this exact structure:
 
 Start generating now. Output each JSON sample on its own line as you generate them."""
 
-    def _extract_samples(self, text: str) -> Iterator[GeneratedSample]:
-        """Extract JSON samples from text."""
-        for line in text.split("\n"):
-            line = line.strip()
-            if not line or not line.startswith("{"):
-                continue
+    def _extract_samples(self, line: str) -> Iterator[GeneratedSample]:
+        """Extract JSON sample from a single line."""
+        line = line.strip()
+        if not line or not line.startswith("{"):
+            return
 
-            try:
-                data = json.loads(line)
-                if "user_input" in data and "reference" in data:
-                    yield GeneratedSample.from_dict(data)
-            except json.JSONDecodeError:
-                continue  # Incomplete JSON, skip
+        try:
+            data = json.loads(line)
+            if "user_input" in data and "reference" in data:
+                yield GeneratedSample.from_dict(data)
+        except json.JSONDecodeError:
+            pass  # Incomplete JSON, skip
