@@ -100,19 +100,21 @@ class LettaProvider:
 
                 # Process complete lines
                 for line in lines:
-                    for sample in self._extract_samples(line):
-                        sample_key = sample.user_input
-                        if sample_key not in seen_samples:
-                            seen_samples.add(sample_key)
-                            yield sample
+                    yield from self._process_line(line, seen_samples)
 
         # Process any remaining content in the buffer
         if buffer:
-            for sample in self._extract_samples(buffer):
-                sample_key = sample.user_input
-                if sample_key not in seen_samples:
-                    seen_samples.add(sample_key)
-                    yield sample
+            yield from self._process_line(buffer, seen_samples)
+
+    def _process_line(
+        self, line: str, seen_samples: set[str]
+    ) -> Iterator[GeneratedSample]:
+        """Process a single line, yielding unique samples."""
+        for sample in self._extract_samples(line):
+            sample_key = sample.user_input
+            if sample_key not in seen_samples:
+                seen_samples.add(sample_key)
+                yield sample
 
     def cleanup(self) -> None:
         """Detach and delete folder from Letta Cloud."""
