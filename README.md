@@ -81,7 +81,7 @@ my-rag-app/
 
 **Advantages:**
 - ✅ Familiar single-project structure
-- ✅ No build tools to learn (only `uv`)
+- ✅ No build tools to learn
 - ✅ Easy to understand and modify
 - ✅ Simple deployment
 
