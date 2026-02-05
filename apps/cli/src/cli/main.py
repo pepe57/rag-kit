@@ -3,7 +3,7 @@ from importlib.metadata import version as get_version
 import typer
 from rich.console import Console
 
-from cli.commands import eval, generate
+from cli.commands import init, generate_dataset
 
 console = Console()
 
@@ -26,8 +26,11 @@ app = typer.Typer(
     help="RAG Facile CLI - Build RAG applications for the French government",
 )
 
-app.add_typer(generate.app, name="generate", help="Generate workspaces and apps")
-app.add_typer(eval.app, name="eval")
+app.add_typer(init.app, name="init", help="Initialize a new workspace")
+app.command(
+    name="generate-dataset",
+    help="Generate synthetic Q/A evaluation dataset from documents",
+)(generate_dataset.run)
 
 
 @app.command()

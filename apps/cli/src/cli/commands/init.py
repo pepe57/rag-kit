@@ -1,4 +1,4 @@
-"""Generate command - orchestrates workspace generation using Init + Patch."""
+"""Initialize new RAG Facile workspaces using Init + Patch architecture."""
 
 import os
 import shutil
