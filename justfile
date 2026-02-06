@@ -1,5 +1,8 @@
 # RAG Facile development tasks
 
+# Use PowerShell on Windows, sh on Unix
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
 # Display available commands
 default:
     @just --list

@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# RAG Facile CLI installer
+# RAG Facile CLI installer for Unix/Linux/macOS/WSL/Git Bash
 # Usage: bash <(curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh)
 
 set -e
+
+# Detect OS
+OS_TYPE=$(uname -s)
+if [[ "$OS_TYPE" == MINGW* ]] || [[ "$OS_TYPE" == MSYS* ]]; then
+    OS_IS_WINDOWS=1
+else
+    OS_IS_WINDOWS=0
+fi
 
 PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
 PROTO_BIN="$PROTO_HOME/bin"
@@ -90,8 +98,8 @@ EOF
 # Setup proxy configuration if detected
 setup_proxy_config
 
-# Install prerequisites on Linux if needed
-if [[ "$(uname)" == "Linux" ]] && command -v apt-get &> /dev/null; then
+# Install prerequisites on Linux if needed (skip on Windows)
+if [[ $OS_IS_WINDOWS -eq 0 ]] && [[ "$(uname)" == "Linux" ]] && command -v apt-get &> /dev/null; then
     missing=""
     for cmd in git curl xz unzip; do
         if ! command -v "$cmd" &> /dev/null; then
@@ -230,15 +238,12 @@ if ! check_tool moon; then
         echo "This often happens behind corporate proxies or VPNs."
         echo "Troubleshooting steps:"
         echo ""
-        echo "1. Check proto logs for details:"
-        echo "   Check ~/.proto logs for more information"
-        echo ""
+        echo "1. Check proto logs for details"
         echo "2. Verify proxy configuration:"
         echo "   cat $PROTOTOOLS_FILE"
         echo ""
         echo "3. Test connectivity to GitHub:"
         echo "   curl -I https://github.com"
-        echo "   curl -I https://ghcr.io"
         echo ""
         echo "4. If you're behind a corporate proxy with SSL inspection:"
         echo "   a) Export your root certificate as a .pem file"
@@ -246,7 +251,7 @@ if ! check_tool moon; then
         echo "      [settings.http]"
         echo "      root-cert = \"/path/to/your/cert.pem\""
         echo ""
-        echo "5. For more help, see: https://moonrepo.dev/docs/proto/config"
+        echo "For more help, see: https://moonrepo.dev/docs/proto/config"
         exit 1
     fi
     
@@ -273,10 +278,19 @@ if ! check_tool uv; then
     fi
 fi
 
-# 4. Install just if needed
+# 4. Install just via proto
 if ! check_tool just; then
-    echo "Installing just..."
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$LOCAL_BIN"
+    echo "Installing just via proto..."
+    # Register the just plugin (idempotent - safe to run even if already registered)
+    proto plugin add just "https://raw.githubusercontent.com/moonrepo/proto-toml-plugins/master/plugins/just.toml" 2>/dev/null || true
+    
+    if ! proto install just; then
+        echo "ERROR: Failed to install just via proto"
+        echo ""
+        echo "This often happens behind corporate proxies or VPNs."
+        echo "See troubleshooting steps from 'moon' installation above."
+        exit 1
+    fi
     
     if ! check_tool just; then
         echo "ERROR: just installed but not working"
@@ -288,44 +302,53 @@ fi
 echo ""
 echo "Installing RAG Facile CLI..."
 BRANCH="${RAG_FACILE_BRANCH:-main}"
-uv tool install rag-facile-cli --force --from "git+https://github.com/etalab-ia/rag-facile.git@${BRANCH}#subdirectory=apps/cli"
 
-# 6. Verify and handle PATH
-echo ""
-if [[ ! -f "$LOCAL_BIN/rag-facile" ]]; then
+if ! uv tool install rag-facile-cli --force --from "git+https://github.com/etalab-ia/rag-facile.git@${BRANCH}#subdirectory=apps/cli"; then
     echo "ERROR: rag-facile installation failed"
     exit 1
 fi
 
-# Check if ~/.local/bin was already in the user's original PATH
-if [[ ":$ORIGINAL_PATH:" == *":$LOCAL_BIN:"* ]]; then
-    echo "✓ RAG Facile CLI installed successfully!"
+# 6. Verify installation
+echo ""
+if ! check_tool rag-facile; then
+    echo "ERROR: rag-facile installation failed"
+    exit 1
+fi
+
+echo "✓ RAG Facile CLI installed successfully!"
+echo ""
+
+# Provide OS-specific guidance
+if [[ $OS_IS_WINDOWS -eq 1 ]]; then
+    echo "🪟 Windows detected (Git Bash / MSYS2)"
     echo ""
-    echo "Get started with:"
-    echo "  rag-facile setup my-rag-app"
+    echo "Proto has configured your tools. You may need to:"
+    echo "  1. Open a new Git Bash / terminal window"
+    echo "  2. Or run: source ~/.bashrc"
+    echo ""
+    echo "💡 For a native Windows PowerShell experience, use install.ps1 instead:"
+    echo "  irm https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.ps1 | iex"
 else
-    echo "rag-facile was installed to $LOCAL_BIN which is not in your PATH."
+    echo "✓ Proto has configured your tools."
     echo ""
-    read -p "Would you like to add $LOCAL_BIN to your PATH? [Y/n] " -n 1 -r < /dev/tty
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+    # Check if ~/.local/bin was already in the original PATH
+    if [[ ":$ORIGINAL_PATH:" == *":$LOCAL_BIN:"* ]]; then
+        echo "Tools are ready to use!"
+    else
+        echo "Proto paths may need to be added to your shell profile."
         profile=$(detect_shell_profile)
+        if [[ ! -f "$profile" ]]; then
+            echo "Creating shell profile: $profile"
+            touch "$profile"
+        fi
         add_to_path "$PROTO_SHIMS" "$profile"
         add_to_path "$PROTO_BIN" "$profile"
-        add_to_path "$LOCAL_BIN" "$profile"
-        
         echo ""
-        echo "✓ RAG Facile CLI installed successfully!"
-        echo ""
-        echo "Run this to use rag-facile in your current terminal:"
+        echo "Run this to use tools in your current terminal:"
         echo "  source $profile"
-        echo ""
-        echo "Or open a new terminal, then:"
-        echo "  rag-facile setup my-rag-app"
-    else
-        echo ""
-        echo "To use rag-facile, add this to your shell profile:"
-        echo "  export PATH=\"$PROTO_SHIMS:$PROTO_BIN:$LOCAL_BIN:\$PATH\""
     fi
 fi
+
+echo ""
+echo "Get started with:"
+echo "  rag-facile setup my-rag-app"
