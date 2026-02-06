@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed with exit code $? ===" && tail -50 /tmp/install.log 2>/dev/null || echo "No log file" && exit 1)
       
       - name: Verify installation
         shell: bash
@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed ===" && exit 1)
       
       - name: Verify .prototools was created
         shell: bash
@@ -107,7 +107,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed ===" && exit 1)
       
       - name: Verify installation
         shell: bash
@@ -143,7 +143,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed ===" && exit 1)
       
       - name: Verify installation
         shell: bash
@@ -183,7 +183,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed ===" && exit 1)
       
       - name: Verify .prototools was created
         shell: bash
@@ -217,7 +217,7 @@ jobs:
       - name: Run PowerShell installer
         shell: powershell
         run: |
-          powershell -ExecutionPolicy Bypass -Command "& { irm ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.ps1 | iex }"
+          powershell -ExecutionPolicy Bypass -Command "& { irm ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.ps1 | iex }" 2>&1 | Tee-Object -FilePath $env:TEMP\install.log
       
       - name: Verify installation
         shell: powershell
@@ -249,7 +249,7 @@ jobs:
         shell: bash
         run: |
           curl -fsSL ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.sh -o /tmp/install.sh
-          bash /tmp/install.sh
+          bash -x /tmp/install.sh 2>&1 || (echo "=== Installer failed ===" && exit 1)
       
       - name: Verify installation
         shell: bash
@@ -284,7 +284,7 @@ jobs:
       - name: Run PowerShell installer with proxy env vars
         shell: powershell
         run: |
-          powershell -ExecutionPolicy Bypass -Command "& { irm ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.ps1 | iex }"
+          powershell -ExecutionPolicy Bypass -Command "& { irm ${{ github.server_url }}/${{ github.repository }}/raw/refs/heads/${{ github.event.pull_request.head.ref || github.ref_name }}/install.ps1 | iex }" 2>&1 | Tee-Object -FilePath $env:TEMP\install.log
       
       - name: Verify .prototools was created
         shell: powershell
