@@ -1,112 +1,97 @@
 # RAG Facile Documentation
 
-Welcome to the RAG Facile documentation. This directory contains guides, troubleshooting resources, and technical documentation for the RAG Facile starter kit.
+Welcome to the RAG Facile documentation hub! Whether you're setting up your environment, deploying to production, or contributing to the project, you'll find guides and references here.
 
-## Quick Navigation
+## Getting Started
 
-### For End Users
+### Installation
 
-**Getting Started**
-- [Installation](../README.md#quick-start) - Basic installation instructions
-- [Proxy & Network Setup Guide](guides/proxy-setup.md) - Complete setup guide for corporate networks and VPNs
+- **[Windows Setup Guide](guides/windows-setup.md)** — Install on Windows (PowerShell or Git Bash) ⭐ **Start here on Windows**
+- **Main README** — [See main installation in README.md](../README.md#1-install-the-cli)
 
-**Troubleshooting**
-- [Proxy Issues](troubleshooting/proxy.md) - Solve proxy and network-related problems
-- [Installation Help](../README.md#quick-start) - General installation troubleshooting
+### First Steps
 
-### For Developers & IT Teams
+1. **[Install the CLI](../README.md#1-install-the-cli)** — One command to install everything
+2. **[Setup Your Workspace](../README.md#2-setup-your-workspace)** — Create your first RAG app
+3. **[Running Your App](../README.md#running-your-app)** — Start the development server
 
-**Technical Deep-Dives**
-- [Issue #46 Investigation](technical/issue-46-investigation.md) - Technical analysis and research findings
-- [Issue #46 Summary](technical/issue-46-summary.md) - Complete implementation summary
+## Setup Guides
 
-## Documentation by Topic
+| Guide | Purpose | Audience |
+|-------|---------|----------|
+| **[Windows Setup](guides/windows-setup.md)** | Install and troubleshoot on Windows (PowerShell/Git Bash) | Windows users |
+| **[Developer Setup (Windows)](guides/developer-setup-windows.md)** | Contribute to RAG Facile on Windows | Contributors on Windows |
+| **[Proxy & Network Setup](guides/proxy-setup.md)** | Install behind corporate proxies and VPNs | Enterprise/restricted networks |
 
-### Installation & Setup
+## Troubleshooting
 
-If you're installing RAG Facile:
-1. Start with the [main README](../README.md#quick-start)
-2. If behind a proxy → [Proxy Setup Guide](guides/proxy-setup.md)
-3. Experiencing issues? → [Troubleshooting: Proxy](troubleshooting/proxy.md)
+| Guide | Problem | Solution |
+|-------|---------|----------|
+| **[Proxy Troubleshooting](troubleshooting/proxy.md)** | SSL/network errors, corporate proxy issues | Behind a proxy? Start here |
 
-### Proxy & Corporate Networks
+## Advanced Topics
 
-RAG Facile supports installation on corporate networks, restricted networks, and behind VPNs.
+| Guide | Purpose | Audience |
+|-------|---------|----------|
+| **[CI/CD Windows Testing](guides/ci-cd-windows.md)** | Test your project on Windows in GitHub Actions | DevOps/maintainers |
 
-**Quick reference:**
-- **Standard HTTP proxy**: See [Quick Start section](guides/proxy-setup.md#quick-start) of Proxy Setup Guide
-- **Corporate proxy with SSL inspection**: See [SSL Certificate Configuration](guides/proxy-setup.md#troubleshooting-ssl-certificate-error)
-- **Network blocked**: See [Troubleshooting: Connection Timeout](troubleshooting/proxy.md#symptom-connection-timeout)
-- **Advanced configuration**: See [Advanced Configuration](guides/proxy-setup.md#advanced-url-rewriting-for-internal-mirrors)
+## Architecture & Contributing
 
-### For IT Teams & System Administrators
+- **[CONTRIBUTING.md](../CONTRIBUTING.md)** — How to contribute to RAG Facile
+- **[AGENTS.md](../AGENTS.md)** — System design and architecture overview
 
-See [Proxy Setup Guide: For IT Teams](guides/proxy-setup.md#for-it-teams--system-administrators) for guidance on:
-- Whitelisting requirements
-- Proxy configuration recommendations
-- Root CA certificate distribution
-- Setup for your organization
+## Reference Documentation
 
-## How This Documentation is Organized
+### Tools & Technologies
 
-### `/guides/` - Actionable User Guides
+- **Proto** — https://moonrepo.dev/docs/proto
+- **Moon** — https://moonrepo.dev/
+- **Uv** — https://docs.astral.sh/uv/
+- **Just** — https://just.systems/
+- **Ruff** — https://docs.astral.sh/ruff/
+- **Chainlit** — https://docs.chainlit.io/
+- **Reflex** — https://reflex.dev/docs/
 
-Step-by-step guides for common tasks and setup scenarios.
+### Sovereign AI & French Government
 
-- **proxy-setup.md**: Complete guide to installing RAG Facile on networks with proxies, VPNs, or corporate firewalls
+- **Albert API** — https://albert.sites.beta.gouv.fr/
+- **Service-public.fr** — https://www.service-public.fr/
 
-### `/troubleshooting/` - Problem Solving
+## FAQ
 
-When something goes wrong, start here.
+### I'm on Windows. Where do I start?
 
-- **proxy.md**: Diagnose and fix proxy-related installation issues
-  - Organized by symptom (Connection Timeout, SSL Certificate Error, etc.)
-  - Includes tests and solutions for each issue
+👉 **[Windows Setup Guide](guides/windows-setup.md)**
 
-### `/technical/` - Technical Documentation
+We provide native PowerShell installer and Git Bash support.
 
-Research, investigation, and implementation details (primarily of historical interest).
+### I'm behind a corporate proxy and getting SSL errors.
 
-- **issue-46-investigation.md**: Technical analysis, research findings, and proto configuration reference
-- **issue-46-summary.md**: Complete implementation summary with testing instructions
+👉 **[Proxy & Network Setup](guides/proxy-setup.md)** and **[Proxy Troubleshooting](troubleshooting/proxy.md)**
 
----
+Both installers detect and configure proxy support automatically. Manual configuration is also documented.
 
-## Common Issues & Quick Fixes
+### I want to contribute to RAG Facile.
 
-### Installation fails at "Installing moon via proto..."
+👉 **[Developer Setup (Windows)](guides/developer-setup-windows.md)** (for Windows) or **[CONTRIBUTING.md](../CONTRIBUTING.md)** (general)
 
-→ You're likely behind a proxy. See [Proxy Setup Guide](guides/proxy-setup.md#quick-start)
+### How do I test RAG Facile on Windows in GitHub Actions?
 
-### SSL certificate verification failed
+👉 **[CI/CD Windows Testing](guides/ci-cd-windows.md)**
 
-→ Corporate proxy performing SSL inspection. See [Troubleshooting: SSL Certificate Error](troubleshooting/proxy.md#symptom-ssl-certificate-error)
+Complete examples for testing PowerShell and Git Bash installers in CI/CD.
 
-### Connection timeout during installation
+### Where is the main README?
 
-→ Proxy or firewall blocking network access. See [Troubleshooting: Connection Timeout](troubleshooting/proxy.md#symptom-connection-timeout)
+👉 **[README.md](../README.md)** in the project root
 
-### Not sure what the problem is?
+## Quick Links
 
-→ Start with [Troubleshooting: Proxy Issues](troubleshooting/proxy.md) - all major symptoms are covered
-
----
-
-## Additional Resources
-
-- **Main Repository**: [github.com/etalab-ia/rag-facile](https://github.com/etalab-ia/rag-facile)
-- **Issue Tracker**: [GitHub Issues](https://github.com/etalab-ia/rag-facile/issues)
-- **Contributing**: See [CONTRIBUTING.md](../CONTRIBUTING.md) in repository root
-
-## Document Versions
-
-All documentation is updated as part of the main project. For specific versions:
-- Check the [GitHub releases page](https://github.com/etalab-ia/rag-facile/releases)
-- Issue #46 fixes included starting from version 0.7.0+
+- **Report an issue:** https://github.com/etalab-ia/rag-facile/issues
+- **Source code:** https://github.com/etalab-ia/rag-facile
+- **Releases:** https://github.com/etalab-ia/rag-facile/releases
 
 ---
 
-**Need help?** 
-- Check the relevant troubleshooting guide first
-- Review the Quick Navigation section above
-- Open an issue on [GitHub](https://github.com/etalab-ia/rag-facile/issues) if you can't find an answer
+**Last updated:** February 6, 2026  
+**Latest version:** See [CHANGELOG](../CHANGELOG.md) for changes
