@@ -37,8 +37,9 @@ def main_callback(
     """RAG Facile CLI - Build RAG applications for the French government."""
     try:
         console.print(BANNER)
-    except UnicodeEncodeError:
+    except Exception:
         # Skip banner if terminal doesn't support Unicode (e.g., Git Bash on Windows with cp1252)
+        # Catching all exceptions since rich may wrap UnicodeEncodeError
         pass
 
     if version:
