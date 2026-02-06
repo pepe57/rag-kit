@@ -225,6 +225,12 @@ if (Test-Path $UvToolsPath) {
     }
 }
 
+# In GitHub Actions, persist PATH for subsequent steps
+if ($env:GITHUB_ENV) {
+    Write-Host "Persisting PATH to GITHUB_ENV for CI..." -ForegroundColor Yellow
+    Add-Content -Path $env:GITHUB_ENV -Value "PATH=$env:PATH"
+}
+
 Write-Host ""
 Write-Host "✓ RAG Facile CLI installed successfully!" -ForegroundColor Green
 Write-Host ""
