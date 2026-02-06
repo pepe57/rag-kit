@@ -76,7 +76,6 @@ jobs:
       - name: Verify installation
         shell: bash
         run: |
-          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== System Info ==="
           uname -m
           bash --version | head -1
@@ -90,8 +89,9 @@ jobs:
       
       - name: Test just commands
         shell: bash
+        env:
+          PYTHONUTF8: "1"  # Force UTF-8 encoding for Python
         run: |
-          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Testing just recipes ==="
           just --list
   
@@ -116,6 +116,8 @@ jobs:
       
       - name: Verify installation
         shell: powershell
+        env:
+          PYTHONUTF8: "1"  # Force UTF-8 encoding for Python (Windows defaults to CP1252)
         run: |
           Write-Host "=== Verifying tools ===" -ForegroundColor Cyan
           rag-facile --version
@@ -126,6 +128,8 @@ jobs:
       
       - name: Test just commands
         shell: powershell
+        env:
+          PYTHONUTF8: "1"  # Force UTF-8 encoding for Python
         run: |
           Write-Host "=== Testing just recipes ===" -ForegroundColor Cyan
           just --list
@@ -150,8 +154,9 @@ jobs:
       
       - name: Verify installation
         shell: bash
+        env:
+          PYTHONUTF8: "1"  # Force UTF-8 encoding for Python (Git Bash defaults to CP1252)
         run: |
-          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Verifying tools ==="
           rag-facile --version
           proto --version
@@ -161,8 +166,9 @@ jobs:
       
       - name: Test just commands
         shell: bash
+        env:
+          PYTHONUTF8: "1"  # Force UTF-8 encoding for Python
         run: |
-          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Testing just recipes ==="
           just --list
   

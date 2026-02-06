@@ -132,7 +132,16 @@ if (-not (Test-Command proto)) {
 
 # Set proto paths for current session
 $ProtoHome = if ($env:PROTO_HOME) { $env:PROTO_HOME } else { "$env:USERPROFILE\.proto" }
-$env:PATH = "$ProtoHome\bin;$ProtoHome\shims;$env:PATH"
+$ProtoBin = "$ProtoHome\bin"
+$ProtoShims = "$ProtoHome\shims"
+$env:PATH = "$ProtoBin;$ProtoShims;$env:PATH"
+
+# In GitHub Actions, add proto paths to GITHUB_PATH for subsequent steps
+if ($env:GITHUB_PATH) {
+    Write-Host "Adding proto paths to GITHUB_PATH for CI..." -ForegroundColor Yellow
+    Add-Content -Path $env:GITHUB_PATH -Value $ProtoShims
+    Add-Content -Path $env:GITHUB_PATH -Value $ProtoBin
+}
 
 if (-not (Test-Command proto)) {
     Write-Host "ERROR: proto installed but not working" -ForegroundColor Red
