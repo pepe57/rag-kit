@@ -348,6 +348,12 @@ else
     fi
 fi
 
+# Export PATH to GitHub Actions environment if running in CI
+if [[ -n "$GITHUB_ENV" ]]; then
+    echo "Exporting PATH to GitHub Actions environment..."
+    echo "PATH=$PATH" >> "$GITHUB_ENV"
+fi
+
 echo ""
 echo "Get started with:"
 echo "  rag-facile setup my-rag-app"
