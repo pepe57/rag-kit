@@ -1,6 +1,8 @@
 # CI/CD Windows Testing Guide
 
-This guide explains how to test RAG Facile on Windows in CI/CD pipelines using GitHub Actions.
+This guide explains how to test RAG Facile installation on Windows in CI/CD pipelines using GitHub Actions.
+
+**See also:** [Linux Testing Guide](ci-cd-linux.md) | [macOS Testing Guide](ci-cd-macos.md) | [Complete Workflow Example](../../.github/workflows/test-install.yml)
 
 ## Why Test on Windows?
 

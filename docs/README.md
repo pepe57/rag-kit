@@ -33,7 +33,10 @@ Welcome to the RAG Facile documentation hub! Whether you're setting up your envi
 
 | Guide | Purpose | Audience |
 |-------|---------|----------|
-| **[CI/CD Windows Testing](guides/ci-cd-windows.md)** | Test your project on Windows in GitHub Actions | DevOps/maintainers |
+| **[CI/CD Testing (Complete)](.github/workflows/test-install.yml)** | Full workflow testing installers on Linux, macOS, Windows | DevOps/maintainers |
+| **[CI/CD Linux Testing](guides/ci-cd-linux.md)** | Test installation on Linux/Ubuntu | DevOps/maintainers |
+| **[CI/CD macOS Testing](guides/ci-cd-macos.md)** | Test installation on macOS (Intel & Apple Silicon) | DevOps/maintainers |
+| **[CI/CD Windows Testing](guides/ci-cd-windows.md)** | Test installation on Windows (PowerShell & Git Bash) | DevOps/maintainers |
 
 ## Architecture & Contributing
 
