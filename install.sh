@@ -215,9 +215,18 @@ if ! check_tool proto; then
         fi
     fi
     
-    # Run the installer
-    if ! bash "$proto_installer" --yes; then
+    # Run the installer (preserve proxy env vars so proto can use them)
+    if ! HTTP_PROXY="$HTTP_PROXY" HTTPS_PROXY="$HTTPS_PROXY" bash "$proto_installer" --yes; then
         echo "ERROR: proto installation failed"
+        echo ""
+        echo "The proto installer itself is having trouble downloading the proto binary."
+        echo "If you see SSL certificate errors above, this is likely a corporate proxy issue."
+        echo ""
+        echo "Possible solutions:"
+        echo "  1. Configure your corporate root certificate in ~/.proto/.prototools"
+        echo "  2. Or ask your IT team to whitelist: github.com, ghcr.io, api.github.com"
+        echo ""
+        echo "For help, see: https://github.com/etalab-ia/rag-facile/blob/main/docs/"
         rm -f "$proto_installer" /tmp/curl-error-$$.txt
         exit 1
     fi
