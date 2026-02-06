@@ -43,6 +43,7 @@ jobs:
       - name: Verify installation
         shell: bash
         run: |
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Verifying tools ==="
           rag-facile --version
           proto --version
@@ -53,7 +54,7 @@ jobs:
       - name: Test just commands
         shell: bash
         run: |
-          cd ${{ github.workspace }}
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Testing just recipes ==="
           just --list
           just format-check
@@ -92,6 +93,7 @@ jobs:
       - name: Verify installation despite proxy
         shell: bash
         run: |
+          source ~/.bashrc || source ~/.bash_profile || true
           rag-facile --version
           proto --version
   
@@ -118,6 +120,7 @@ jobs:
       - name: Verify installation
         shell: bash
         run: |
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== System Info ==="
           uname -m
           bash --version | head -1
@@ -132,7 +135,7 @@ jobs:
       - name: Test just commands
         shell: bash
         run: |
-          cd ${{ github.workspace }}
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Testing just recipes ==="
           just --list
           just format-check
@@ -171,6 +174,7 @@ jobs:
       - name: Verify installation despite proxy
         shell: bash
         run: |
+          source ~/.bashrc || source ~/.bash_profile || true
           rag-facile --version
           proto --version
   
@@ -203,7 +207,7 @@ jobs:
       - name: Test just commands
         shell: powershell
         run: |
-          Set-Location ${{ github.workspace }}
+          source ~/.bashrc || source ~/.bash_profile || true
           Write-Host "=== Testing just recipes ===" -ForegroundColor Cyan
           just --list
           just format-check
@@ -228,6 +232,7 @@ jobs:
       - name: Verify installation
         shell: bash
         run: |
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Verifying tools ==="
           rag-facile --version
           proto --version
@@ -238,7 +243,7 @@ jobs:
       - name: Test just commands
         shell: bash
         run: |
-          cd ${{ github.workspace }}
+          source ~/.bashrc || source ~/.bash_profile || true
           echo "=== Testing just recipes ==="
           just --list
           just format-check
