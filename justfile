@@ -1,8 +1,16 @@
 # RAG Facile development tasks
 
+# Use PowerShell on Windows, sh on Unix
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
 # Display available commands
 default:
     @just --list
+
+# Sync dependencies and install pre-commit hooks
+sync:
+    uv sync
+    uv run pre-commit install
 
 # Format code (write changes)
 format:

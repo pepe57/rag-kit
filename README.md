@@ -25,12 +25,29 @@ RAG Facile provides a foundation for building RAG (Retrieval-Augmented Generatio
 
 One command installs the entire toolchain (proto, moon, uv) and the CLI:
 
+#### Linux / macOS / WSL
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh | bash
 source ~/.bashrc  # or restart your terminal
 ```
 
 > **Note**: On Ubuntu/Debian, the installer will automatically install prerequisites (git, curl, xz-utils, unzip) if needed.
+
+#### Windows (PowerShell) — Recommended
+
+```powershell
+irm https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.ps1 | iex
+```
+
+Open a new PowerShell window and you're ready to go!
+
+#### Windows (Git Bash / MSYS2)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/etalab-ia/rag-facile/main/install.sh)
+source ~/.bashrc
+```
 
 > **Behind a corporate proxy or VPN?** The installer automatically detects and configures proxy support. See [Installation Documentation](docs/) for troubleshooting guides.
 
@@ -66,8 +83,14 @@ Your app will open in the browser, ready to use!
 
 For detailed guides and troubleshooting, see the [Documentation Hub](docs/):
 
+### Installation & Setup
+
+- **[Windows Setup Guide](docs/guides/windows-setup.md)** - Complete guide for Windows (PowerShell and Git Bash)
 - **[Proxy & Network Setup](docs/guides/proxy-setup.md)** - Install RAG Facile on corporate networks or behind VPNs
 - **[Proxy Troubleshooting](docs/troubleshooting/proxy.md)** - Solve network-related issues
+
+### Reference
+
 - **[Full Documentation Index](docs/)** - All guides and resources
 
 ## Project Structure Options

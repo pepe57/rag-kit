@@ -1,4 +1,5 @@
 from importlib.metadata import version as get_version
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -16,9 +17,6 @@ BANNER = """[magenta]
  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝     ╚═╝     ╚═╝  ╚═╝ ╚═════╝╚═╝╚══════╝╚══════╝
 [/magenta]"""
 
-# Print banner on every invocation
-console.print(BANNER)
-
 app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
@@ -27,9 +25,27 @@ app = typer.Typer(
 )
 
 
-def version():
-    """Show the CLI version."""
-    print(f"rag-facile v{get_version('rag-facile-cli')}")
+@app.callback()
+def main_callback(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show the CLI version and exit",
+    ),
+) -> None:
+    """RAG Facile CLI - Build RAG applications for the French government."""
+    try:
+        console.print(BANNER)
+    except Exception:
+        # Skip banner if terminal doesn't support Unicode (e.g., Git Bash on Windows with cp1252)
+        # Catching all exceptions since rich may wrap UnicodeEncodeError
+        pass
+
+    if version:
+        cli_version = get_version("rag-facile-cli")
+        console.print(f"[cyan]rag-facile v{cli_version}[/cyan]")
+        raise typer.Exit()
 
 
 # Register commands in alphabetical order
@@ -39,8 +55,6 @@ app.command(
 )(generate_dataset.run)
 
 app.command(name="setup", help="Setup a new workspace")(setup.run)
-
-app.command()(version)
 
 
 if __name__ == "__main__":

@@ -41,11 +41,11 @@ uvx --from git+https://github.com/etalab-ia/rag-facile.git#subdirectory=apps/cli
 # Show all available commands
 rag-facile --help
 
+# Check version
+rag-facile --version
+
 # Setup a new workspace
 rag-facile setup my-rag-app
-
-# Check version
-rag-facile version
 ```
 
 ## Commands

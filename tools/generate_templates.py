@@ -84,7 +84,7 @@ def generate_sys_config():
 
     toolchain = {
         "$schema": "https://moonrepo.dev/schemas/toolchain.json",
-        "python": {"version": "3.13", "packageManager": "uv"},
+        "python": {"version": "3.13.11", "packageManager": "uv"},
     }
     (moon_dir / "toolchain.yml").write_text(yaml.dump(toolchain, sort_keys=False))
 
@@ -171,15 +171,34 @@ type-check:
 # Run all checks (format-check, lint, type-check)
 check: format-check lint type-check
 
-# Sync dependencies
+# Sync dependencies and install pre-commit hooks
 sync:
     uv sync
+    uv run pre-commit install
 
 # Add a new app from template (e.g., just add chainlit-chat)
 add template:
     moon generate {% raw %}{{template}}{% endraw %}
 """
     (target / "justfile").write_text(justfile)
+
+    # Create .prototools for proto toolchain management
+    prototools = """\
+# Proto toolchain configuration for {{ project_name }}
+# This file pins versions of all tools used in the project
+# See: https://moonrepo.dev/docs/proto
+
+python = "3.13.11"
+
+# Plugins for non-core tools
+[plugins]
+just = "source:https://raw.githubusercontent.com/Phault/proto-toml-plugins/main/just/plugin.toml"
+
+# Tool-specific versions
+[tools.just]
+version = "1.34.0"
+"""
+    (target / ".prototools").write_text(prototools)
 
     console.print("[green]✓[/green] sys-config generated")
 
@@ -351,18 +370,19 @@ context_providers:
             rxconfig_path.write_text(content)
             console.print("  [green]✓[/green] rxconfig.py parameterized")
 
-        # Rename package directory for Moon path interpolation
+        # Rename package directory to static name (Windows-compatible)
+        # Moon only supports simple variable interpolation in paths: [varName]
+        # Filters like | replace() are NOT supported in directory names
         pkg_dir = target / "reflex_chat"
         if pkg_dir.exists():
-            # Rename main app file
+            # Rename main app file to static name
             main_app = pkg_dir / "reflex_chat.py"
             if main_app.exists():
-                new_app_name = "[project_name | replace(from='-', to='_')].py"
-                main_app.rename(pkg_dir / new_app_name)
+                # Use static name - actual module name is parameterized in rxconfig.py
+                main_app.rename(pkg_dir / "app.py")
 
-            # Rename package directory
-            new_pkg_dir_name = "[project_name | replace(from='-', to='_')]"
-            pkg_dir.rename(target / new_pkg_dir_name)
+            # Rename package directory to static name
+            pkg_dir.rename(target / "app")
             console.print("  [green]✓[/green] Reflex package structure parameterized")
 
     # Phase 6: Generate template.yml
