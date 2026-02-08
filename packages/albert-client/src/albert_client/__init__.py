@@ -5,10 +5,10 @@ French government-specific features like RAG search, collections management,
 and carbon footprint tracking.
 """
 
-# Re-export commonly used OpenAI types for convenience
-# Apps can use these types without importing openai directly
+# Third-party imports
 from openai.types.chat import ChatCompletionMessageParam
 
+# Local imports
 from albert_client._async_client import AsyncAlbertClient
 from albert_client._version import __version__
 from albert_client.client import AlbertClient

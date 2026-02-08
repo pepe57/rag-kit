@@ -5,13 +5,13 @@ description = "{{ description }}"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "reflex>=0.7.11",
     "albert-client",
-    "python-dotenv>=1.0.0",
-    "pyyaml>=6.0.0",
 {%- if use_pdf %}
     "pdf-context",
 {%- endif %}
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+    "reflex>=0.7.11",
 ]
 
 [project.scripts]

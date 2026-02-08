@@ -5,18 +5,18 @@ description = "RAG Facile CLI - Generate RAG workspaces for French Government"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "typer>=0.12.0",
-    "rich>=13.0.0",
+    "albert-client",
+    "datasets>=3.0.0",
+    "huggingface-hub>=1.3.0",
+    "letta-client>=0.1.0",
     "libcst>=1.8.6",
+    "pypdf>=5.0.0",
+    "python-dotenv>=1.0.0",
     "pyyaml>=6.0.2",
     "questionary>=2.0.0",
-    "huggingface-hub>=1.3.0",
-    "datasets>=3.0.0",
-    "python-dotenv>=1.0.0",
-    "letta-client>=0.1.0",
     "requests>=2.31.0",
-    "pypdf>=5.0.0",
-    "albert-client",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
 ]
 
 [dependency-groups]
