@@ -72,7 +72,8 @@ class OCRResponse(BaseModel):
     document_annotation: str | None = None
     id: str | None = None
     model: str | None = None
-    usage: Any | None = None  # Can be Usage or OCRUsage
+    # Can be Usage (from search.py) or OCRUsage - using Any to avoid circular imports
+    usage: Any = None
     usage_info: OCRUsage | None = None
 
 
@@ -95,7 +96,8 @@ class ParsedDocument(BaseModel):
 
     object: Literal["list"] = "list"
     data: list[ParsedDocumentPage]
-    usage: Any | None = None  # Usage information
+    # Usage information (from search.py) - using Any to avoid circular imports
+    usage: Any = None
 
 
 # File upload types
