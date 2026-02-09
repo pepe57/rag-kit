@@ -686,6 +686,7 @@ def run(
         "sys-config",
         "chainlit-chat",
         "reflex-chat",
+        "albert-client",
         "pdf-context",
         "chroma-context",
     ]:
@@ -760,10 +761,22 @@ OPENAI_MODEL={env_config["openai_model"]}
     env_file.write_text(env_content)
     console.print("[green]✓[/green] Created .env file")
 
+    # 4. Generate albert-client package (always required)
+    console.print()
+    console.print(
+        "[bold green]Step 4:[/bold green] Generating albert-client package..."
+    )
+    albert_cmd = ["moon", "generate", "albert-client", "--defaults"]
+    if force:
+        albert_cmd.append("--force")
+    if not run_command(albert_cmd, "generate albert-client", cwd=target_path):
+        raise typer.Exit(1)
+    console.print("[green]✓[/green] albert-client package generated")
+
     # 5. Generate selected packages
     if selected_modules:
         console.print()
-        console.print("[bold green]Step 4:[/bold green] Generating packages...")
+        console.print("[bold green]Step 5:[/bold green] Generating packages...")
 
         for module in selected_modules:
             module_info = MODULES[module]
@@ -789,14 +802,14 @@ OPENAI_MODEL={env_config["openai_model"]}
 
     # Run uv sync to install dependencies
     console.print()
-    console.print("[bold green]Step 5:[/bold green] Installing dependencies...")
+    console.print("[bold green]Step 6:[/bold green] Installing dependencies...")
     if not run_command(["uv", "sync"], "install dependencies", cwd=target_path):
         console.print("[yellow]Warning: uv sync failed. Run it manually.[/yellow]")
 
     # Start the dev server
     console.print()
     console.print(
-        f"[bold green]Step 6:[/bold green] Starting {frontend_choice} dev server..."
+        f"[bold green]Step 7:[/bold green] Starting {frontend_choice} dev server..."
     )
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
