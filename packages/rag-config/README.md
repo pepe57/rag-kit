@@ -1,13 +1,23 @@
 # RAG Config
 
-Configuration management for RAG Facile - TOML-based settings with validation and presets.
+Configuration management for RAG Facile - customize your RAG pipeline without touching code.
+
+## Why Use This?
+
+**Stop hardcoding RAG parameters.** Whether you need fast responses or maximum accuracy, different temperature settings for production vs development, or domain-specific optimizations - configure it all in one place.
+
+**Key Benefits:**
+- **Start Fast** - Apply a preset (`balanced`, `legal`, `hr`) and go
+- **Iterate Easily** - Tune model, temperature, retrieval settings via TOML file
+- **Deploy Confidently** - Override configs per environment with env vars
+- **Stay Type-Safe** - Pydantic validation catches errors before runtime
 
 ## Features
 
 - **Complete RAG Pipeline Coverage** - 12 phases from ingestion to response formatting
-- **Type-Safe** - Pydantic models with full validation
 - **Preset System** - Start with battle-tested configs (fast, balanced, accurate, legal, hr)
-- **Environment Override** - Override any config value with env vars
+- **Environment Override** - Override any config value with env vars (no code changes)
+- **Type-Safe** - Pydantic models with full validation
 - **Schema Versioning** - Forward-compatible config migrations
 - **JSON Schema Export** - Documentation and IDE autocomplete support
 
@@ -90,6 +100,64 @@ print(list_presets())  # ['fast', 'balanced', 'accurate', 'legal', 'hr']
 # Load a preset
 config = load_preset("legal")
 print(config.hallucination.enabled)  # True (legal requires strict accuracy)
+```
+
+## Common Use Cases
+
+### Build a Legal Document Q&A System
+
+```python
+from rag_config import load_preset
+
+# Legal preset: strict citations, low temperature, hallucination detection
+config = load_preset("legal")
+
+# Your RAG pipeline automatically uses:
+# - temperature 0.3 (consistent answers)
+# - mandatory source citations [1], [2]
+# - hallucination detection enabled
+# - higher retrieval threshold for accuracy
+```
+
+### Different Configs Per Environment
+
+```bash
+# Development - fast iteration
+export RAG_GENERATION_MODEL=openweight-small
+export RAG_RERANKING_ENABLED=false
+
+# Production - maximize quality
+export RAG_GENERATION_MODEL=openweight-large
+export RAG_RERANKING_ENABLED=true
+export RAG_HALLUCINATION_ENABLED=true
+```
+
+### Optimize for Speed vs Quality
+
+```python
+from rag_config import load_preset
+
+# Fast prototype - skip expensive operations
+config = load_preset("fast")
+# Uses: smaller model, no reranking, fixed-size chunks
+
+# Production - maximize accuracy
+config = load_preset("accurate")
+# Uses: larger model, reranking enabled, semantic chunks, hallucination detection
+```
+
+### A/B Test RAG Parameters
+
+```python
+from rag_config import load_config
+
+# Load base config
+config = load_config("ragfacile.toml")
+
+# Test different temperatures
+for temp in [0.3, 0.5, 0.7]:
+    config.generation.temperature = temp
+    # Run your evaluation suite
 ```
 
 ## Configuration Sections
