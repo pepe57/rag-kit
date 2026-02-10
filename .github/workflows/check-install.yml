@@ -1,20 +1,46 @@
-name: Test Installation Scripts
+name: Check Install
 
 on:
   pull_request:
     paths:
+      # Installer scripts
       - 'install.sh'
       - 'install.ps1'
       - '.prototools'
-      - '.github/workflows/test-install.yml'
+      
+      # CLI changes (packaging, bundling, dependencies)
+      - 'apps/cli/**'
+      
+      # Package structure (bundled with CLI)
+      - 'packages/**/pyproject.toml'
+      - 'packages/**/src/**'
+      
+      # Templates (bundled with CLI)
+      - '.moon/templates/**'
+      
+      # This workflow
+      - '.github/workflows/check-install.yml'
   push:
     branches:
       - main
     paths:
+      # Installer scripts
       - 'install.sh'
       - 'install.ps1'
       - '.prototools'
-      - '.github/workflows/test-install.yml'
+      
+      # CLI changes (packaging, bundling, dependencies)
+      - 'apps/cli/**'
+      
+      # Package structure (bundled with CLI)
+      - 'packages/**/pyproject.toml'
+      - 'packages/**/src/**'
+      
+      # Templates (bundled with CLI)
+      - '.moon/templates/**'
+      
+      # This workflow
+      - '.github/workflows/check-install.yml'
 
 # Minimal permissions: workflow only needs to read repo contents
 permissions:
