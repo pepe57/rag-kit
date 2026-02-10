@@ -146,7 +146,8 @@ def get_templates_dir() -> Path:
     """Get the templates directory bundled with the CLI package."""
     # Templates are bundled in the package at cli/templates
     package_templates = Path(__file__).resolve().parent.parent / "templates"
-    if package_templates.exists():
+    # Check if it exists AND contains the expected frontend templates
+    if package_templates.exists() and (package_templates / "chainlit-chat").exists():
         return package_templates
 
     # Fallback: check if we're in the rag-facile repo (development mode)
