@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["apps/*", "packages/*"]
+members = ["apps/*", "packages/core/*", "packages/retrieval/*"]
 
 [tool.ty.src]
 exclude = [".moon/templates"]

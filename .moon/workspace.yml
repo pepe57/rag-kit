@@ -1,6 +1,7 @@
 projects:
   - 'apps/*'
-  - 'packages/*'
+  - 'packages/core/*'
+  - 'packages/retrieval/*'
   - 'tools'
 
 vcs:

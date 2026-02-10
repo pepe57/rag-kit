@@ -164,7 +164,9 @@ def get_pdf_context_source() -> Path:
     """Get the pdf-context source directory for inline copying."""
     # In development mode, use the packages directory
     repo_root = Path(__file__).resolve().parents[5]
-    local_source = repo_root / "packages" / "pdf-context" / "src" / "pdf_context"
+    local_source = (
+        repo_root / "packages" / "retrieval" / "pdf-context" / "src" / "pdf_context"
+    )
     if local_source.exists():
         return local_source
 
@@ -182,7 +184,9 @@ def get_albert_client_source() -> Path:
     """Get the albert-client source directory for inline copying."""
     # In development mode, use the packages directory
     repo_root = Path(__file__).resolve().parents[5]
-    local_source = repo_root / "packages" / "albert-client" / "src" / "albert_client"
+    local_source = (
+        repo_root / "packages" / "core" / "albert-client" / "src" / "albert_client"
+    )
     if local_source.exists():
         return local_source
 
@@ -200,7 +204,7 @@ def get_rag_config_source() -> Path:
     """Get the rag-config source directory for inline copying."""
     # In development mode, use the packages directory
     repo_root = Path(__file__).resolve().parents[5]
-    local_source = repo_root / "packages" / "rag-config" / "src" / "rag_config"
+    local_source = repo_root / "packages" / "core" / "rag-config" / "src" / "rag_config"
     if local_source.exists():
         return local_source
 

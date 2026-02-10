@@ -124,7 +124,8 @@ async def main(message: cl.Message):
     await msg.send()
 
     # Create the completion with streaming
-    stream = await client.chat.completions.create(
+    # TODO: Fix OpenAI SDK streaming overload type error (tracked for future PR)
+    stream = await client.chat.completions.create(  # type: ignore[no-matching-overload]
         model=model,
         messages=message_history,
         tools=tools,
@@ -189,7 +190,8 @@ async def main(message: cl.Message):
             await call_tool(tool_call, message_history)
 
         # Now we need to get the final response from the model
-        stream_post_tool = await client.chat.completions.create(
+        # TODO: Fix OpenAI SDK streaming overload type error (tracked for future PR)
+        stream_post_tool = await client.chat.completions.create(  # type: ignore[no-matching-overload]
             model=model,
             messages=message_history,
             stream=True,
