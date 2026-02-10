@@ -92,7 +92,7 @@ class TestConstants:
     def test_modules_has_pdf(self):
         """Should have PDF module option."""
         assert "PDF" in MODULES
-        assert MODULES["PDF"]["template"] == "pdf-context"
+        assert MODULES["PDF"]["template"] == "full-context"
         assert MODULES["PDF"]["available"] is True
 
     def test_modules_has_chroma(self):
