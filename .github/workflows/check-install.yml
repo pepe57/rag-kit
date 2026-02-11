@@ -10,6 +10,7 @@ on:
       
       # CLI changes (packaging, bundling, dependencies)
       - 'apps/cli/**'
+      - '!apps/cli/**/*.md'
       
       # Package structure (bundled with CLI)
       - 'packages/**/pyproject.toml'
@@ -17,6 +18,7 @@ on:
       
       # Templates (bundled with CLI)
       - '.moon/templates/**'
+      - '!.moon/templates/**/*.md'
       
       # This workflow
       - '.github/workflows/check-install.yml'
@@ -31,6 +33,7 @@ on:
       
       # CLI changes (packaging, bundling, dependencies)
       - 'apps/cli/**'
+      - '!apps/cli/**/*.md'
       
       # Package structure (bundled with CLI)
       - 'packages/**/pyproject.toml'
@@ -38,6 +41,7 @@ on:
       
       # Templates (bundled with CLI)
       - '.moon/templates/**'
+      - '!.moon/templates/**/*.md'
       
       # This workflow
       - '.github/workflows/check-install.yml'
