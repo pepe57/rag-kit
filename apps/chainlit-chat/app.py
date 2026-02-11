@@ -9,6 +9,7 @@ from context_loader import process_file
 from dotenv import load_dotenv
 
 from albert import AsyncAlbertClient
+from config import get_config
 
 
 # Increase the number of packets allowed in a single payload to prevent "Too
@@ -18,10 +19,14 @@ engineio.payload.Payload.max_decode_packets = 200
 
 load_dotenv()
 
-# Configure OpenAI
+# Load RAG configuration
+rag_config = get_config()
+
+# Configure OpenAI (API credentials still from env vars)
 api_key = os.getenv("OPENAI_API_KEY")
 base_url = os.getenv("OPENAI_BASE_URL")
-model = os.getenv("OPENAI_MODEL")
+# Model comes from config with env var override
+model = os.getenv("OPENAI_MODEL") or rag_config.generation.model
 
 client = AsyncAlbertClient(api_key=api_key, base_url=base_url)
 
@@ -67,9 +72,10 @@ tools = [
 
 @cl.on_chat_start
 def start_chat():
+    # Use system prompt from config
     cl.user_session.set(
         "message_history",
-        [{"role": "system", "content": "You are a helpful assistant."}],
+        [{"role": "system", "content": rag_config.generation.system_prompt}],
     )
 
 
@@ -123,14 +129,23 @@ async def main(message: cl.Message):
     # Send an empty message to start the stream UI
     await msg.send()
 
-    # Create the completion with streaming
-    # TODO: Fix OpenAI SDK streaming overload type error (tracked for future PR)
-    stream = await client.chat.completions.create(  # type: ignore[no-matching-overload]
+    # Common generation parameters from config
+    gen_params = {
+        "stream": rag_config.generation.streaming,
+        "temperature": rag_config.generation.temperature,
+        "max_tokens": rag_config.generation.max_tokens,
+    }
+
+    # TODO: OpenAI SDK can't infer correct return type when stream parameter is a variable
+    # This causes ty to report no-matching-overload error. Need to either:
+    # 1. Split into separate streaming/non-streaming code paths with literal True/False
+    # 2. Wait for OpenAI SDK to improve overload inference with runtime booleans
+    stream = await client.chat.completions.create(  # ty: ignore[no-matching-overload]
         model=model,
         messages=message_history,
         tools=tools,
         tool_choice="auto",
-        stream=True,
+        **gen_params,
     )
 
     cur_tool_calls = []
@@ -189,15 +204,15 @@ async def main(message: cl.Message):
         for tool_call in cur_tool_calls:
             await call_tool(tool_call, message_history)
 
-        # Now we need to get the final response from the model
-        # TODO: Fix OpenAI SDK streaming overload type error (tracked for future PR)
-        stream_post_tool = await client.chat.completions.create(  # type: ignore[no-matching-overload]
+        # Now we need to get the final response from the model (uses config values)
+        stream_post_tool = await client.chat.completions.create(
             model=model,
             messages=message_history,
-            stream=True,
+            **gen_params,
         )
 
-        async for part in stream_post_tool:
+        # Type ignore: SDK can't infer stream type when stream parameter is variable
+        async for part in stream_post_tool:  # type: ignore[union-attr]
             if not part.choices:
                 continue
             if part.choices[0].delta.content:
