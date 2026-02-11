@@ -52,7 +52,7 @@ rag-facile setup my-rag-app
 
 ### `setup`
 
-Setup a new RAG workspace with your choice of structure, frontend, and modules.
+Setup a new RAG workspace with your choice of structure, frontend, and configuration preset.
 
 ```bash
 rag-facile setup <name>
@@ -62,11 +62,11 @@ The CLI will guide you through:
 1. **Project structure** - Choose between:
    - **Simple** - Flat structure, single app, easy to understand (recommended for getting started)
    - **Monorepo** - Multi-app workspace with shared packages (for larger projects)
-2. **Frontend selection** - Choose Chainlit or Reflex
-3. **Module selection** - Add PDF processing, vector stores, etc.
-4. **Environment configuration** - Set your Albert API key and preferences
+2. **Configuration preset** - Choose from Balanced, Fast, Accurate, Legal, or HR. This automatically sets up your model, temperature, and RAG parameters.
+3. **Frontend selection** - Choose Chainlit or Reflex
+4. **Environment configuration** - Set your Albert API key (the preset handles base URLs and model IDs)
 
-See the main [README](../../README.md) for detailed comparison of project structures.
+See the main [README](../../README.md) for detailed comparison of project structures and presets.
 
 ### `generate-dataset`
 

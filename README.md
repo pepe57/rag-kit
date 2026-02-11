@@ -67,12 +67,13 @@ rag-facile setup my-rag-app
 
 The CLI will guide you through:
 1. **Project structure** - Choose Simple or Monorepo (see below)
-2. **Frontend selection** - Choose Chainlit or Reflex
-3. **Module selection** - Add PDF processing, vector stores, etc.
-4. **Environment configuration** - Set your Albert API key and preferences
+2. **Configuration preset** - Choose from Balanced, Fast, Accurate, Legal, or HR
+3. **Frontend selection** - Choose Chainlit or Reflex
+4. **Environment configuration** - Set your Albert API key (presets handle the rest)
 
 After configuration, the CLI automatically:
 - Sets up your workspace with the selected components
+- Creates your `ragfacile.toml` based on your chosen preset
 - Creates your `.env` file with your credentials
 - Installs all dependencies with `uv sync`
 - Starts the development server
@@ -194,15 +195,18 @@ rag-facile config set generation.temperature 0.5
 - `fast` - Speed-optimized (smaller models, skip reranking)
 - `accurate` - Quality-optimized (larger models, hallucination detection)
 - `legal` - For legal documents (strict citations, accuracy validation)
-- `hr` - For HR policies (privacy-aware, clear attribution)
+- `hr` - For HR policies (privacy-aware, clear attribution, semantic search)
+
+**Precedence:** Environment Variables > `ragfacile.toml` > Presets.
 
 **Environment Variable Overrides:**
 ```bash
+# Format: RAG_<SECTION>_<KEY>
 export RAG_GENERATION_MODEL=openweight-large
 export RAG_RERANKING_ENABLED=true
 ```
 
-See [Configuration Guide](packages/rag-config/README.md) for complete documentation.
+See [Configuration Guide](docs/guides/config-guide.md) for complete documentation.
 
 ### Albert Client SDK
 

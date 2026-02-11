@@ -73,6 +73,7 @@ rag-facile/
 │   ├── chainlit-chat/       # Chainlit frontend
 │   └── reflex-chat/         # Reflex frontend
 ├── packages/                # Shared packages
+│   ├── core-config/         # RAG Configuration System
 │   └── pdf-context/         # PDF processing
 ├── tools/                   # Development tools
 │   └── moon.yml             # Code quality tasks
@@ -259,3 +260,12 @@ The CI pipeline runs:
 - `moon run cli:test` - Tests
 
 All checks must pass before merging.
+
+## Configuration-Driven Architecture
+
+RAG Facile uses a configuration-driven architecture. Most components (apps, packages) do not have hardcoded RAG parameters. Instead, they consume the `RAGConfig` Pydantic model from `packages/core-config`.
+
+When adding new features that require configuration:
+1. Define the schema in `packages/core-config/src/config/schema.py`.
+2. Update presets in `packages/core-config/presets/` if applicable.
+3. Access the configuration in your code using `rag_config.get_config()`.
