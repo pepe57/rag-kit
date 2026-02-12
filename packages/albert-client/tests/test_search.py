@@ -25,8 +25,11 @@ def mock_search_response():
                 "chunk": {
                     "object": "chunk",
                     "id": 123,
+                    "collection_id": 1,
+                    "document_id": 10,
                     "metadata": {"source": "doc1.pdf", "page": 5},
                     "content": "La loi Énergie Climat vise à accélérer la transition énergétique.",
+                    "created": 1700000000,
                 },
             },
             {
@@ -35,8 +38,11 @@ def mock_search_response():
                 "chunk": {
                     "object": "chunk",
                     "id": 456,
+                    "collection_id": 1,
+                    "document_id": 11,
                     "metadata": {"source": "doc2.pdf", "page": 12},
                     "content": "Les énergies renouvelables sont au cœur de cette transition.",
+                    "created": 1700000000,
                 },
             },
         ],
@@ -156,8 +162,11 @@ class TestSearch:
                     "chunk": {
                         "object": "chunk",
                         "id": 1,
+                        "collection_id": 1,
+                        "document_id": 10,
                         "metadata": {},
                         "content": "Test content",
+                        "created": 1700000000,
                     },
                 }
             ],

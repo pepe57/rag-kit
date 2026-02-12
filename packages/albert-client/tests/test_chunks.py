@@ -19,8 +19,11 @@ def mock_chunk():
     return {
         "object": "chunk",
         "id": 789,
+        "collection_id": 123,
+        "document_id": 456,
         "metadata": {"page": 1, "source": "test_doc.pdf"},
         "content": "This is the content of the chunk from the document.",
+        "created": 1700000000,
     }
 
 
@@ -108,6 +111,8 @@ class TestGetChunk:
         chunk_with_metadata = {
             "object": "chunk",
             "id": 789,
+            "collection_id": 123,
+            "document_id": 456,
             "metadata": {
                 "page": 1,
                 "source": "test_doc.pdf",
@@ -115,6 +120,7 @@ class TestGetChunk:
                 "author": "John Doe",
             },
             "content": "Sample content.",
+            "created": 1700000000,
         }
 
         respx.get(f"{base_url.rstrip('/')}/chunks/456/789").mock(

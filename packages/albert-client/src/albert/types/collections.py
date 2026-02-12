@@ -1,56 +1,55 @@
-"""Collections and documents types for Albert API.
+"""Types for Albert API Collections and Documents."""
 
-Models for managing RAG collections and document uploads.
-"""
+from __future__ import annotations
 
 from typing import Literal
 
 from albert._models import BaseModel
 
-
-# Collection types
-
+# Enums as Literal types
 CollectionVisibility = Literal["private", "public"]
-"""Collection visibility: private (owner only) or public (all users)."""
 
 
 class Collection(BaseModel):
-    """A RAG collection for organizing documents."""
+    """A collection in Albert API."""
 
-    object: Literal["collection"] = "collection"
+    object: str = "collection"
     id: int
     name: str
     owner: str
     description: str | None = None
     visibility: CollectionVisibility | None = None
-    created: int  # Unix timestamp
-    updated: int  # Unix timestamp
-    documents: int = 0  # Number of documents in collection
+    created: int
+    updated: int
+    documents: int = 0
 
 
 class CollectionList(BaseModel):
-    """Response from listing collections."""
+    """List of collections (Searches response wrapper)."""
 
-    object: Literal["list"] = "list"
-    data: list[Collection]
-
-
-# Document types
+    object: str = "list"
+    data: list[Collection] = []
 
 
 class Document(BaseModel):
-    """A document uploaded to a collection."""
+    """A document in a collection."""
 
-    object: Literal["document"] = "document"
+    object: str = "document"
     id: int
     name: str
     collection_id: int
-    created: int  # Unix timestamp
-    chunks: int | None = None  # Number of chunks (may be None during upload)
+    created: int
+    chunks: int | None = None
+
+
+class DocumentResponse(BaseModel):
+    """Response from creating a document (just the ID)."""
+
+    id: int
 
 
 class DocumentList(BaseModel):
-    """Response from listing documents."""
+    """List of documents."""
 
-    object: Literal["list"] = "list"
-    data: list[Document]
+    object: str = "list"
+    data: list[Document] = []
