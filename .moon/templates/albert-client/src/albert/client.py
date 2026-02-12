@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import httpx
 from openai import OpenAI
 
 
@@ -113,6 +114,30 @@ class AlbertClient:
         """Get the base URL."""
         return str(self._client.base_url)
 
+    def _make_request(self, method: str, path: str, **kwargs) -> "httpx.Response":
+        """Make an authenticated HTTP request using the internal httpx client.
+
+        Adds the Authorization header with the API key and delegates to the
+        wrapped OpenAI client's internal httpx client.
+
+        Args:
+            method: HTTP method (get, post, patch, delete, etc.)
+            path: API endpoint path (e.g., "/collections")
+            **kwargs: Additional arguments to pass to the httpx method
+
+        Returns:
+            httpx.Response object
+        """
+        # Add authorization header if not already present
+        headers = kwargs.get("headers", {})
+        if "Authorization" not in headers and "authorization" not in headers:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        kwargs["headers"] = headers
+
+        # Get the HTTP method from the internal httpx client
+        http_method = getattr(self._client._client, method)
+        return http_method(path, **kwargs)
+
     # Phase 2: Search and Rerank methods
 
     def search(
@@ -172,8 +197,8 @@ class AlbertClient:
         if score_threshold is not None:
             body["score_threshold"] = score_threshold
 
-        # Make request using internal httpx client
-        response = self._client._client.post("/search", json=body)
+        # Make authenticated request
+        response = self._make_request("post", "/search", json=body)
         response.raise_for_status()
 
         # Parse and return Pydantic model
@@ -230,8 +255,8 @@ class AlbertClient:
         if top_n is not None:
             body["top_n"] = top_n
 
-        # Make request using internal httpx client
-        response = self._client._client.post("/rerank", json=body)
+        # Make authenticated request
+        response = self._make_request("post", "/rerank", json=body)
         response.raise_for_status()
 
         # Parse and return Pydantic model
@@ -278,8 +303,8 @@ class AlbertClient:
         if description is not None:
             body["description"] = description
 
-        # Make request
-        response = self._client._client.post("/collections", json=body)
+        # Make authenticated request
+        response = self._make_request("post", "/collections", json=body)
         response.raise_for_status()
 
         return Collection(**response.json())
@@ -304,7 +329,7 @@ class AlbertClient:
         """
         from albert.types import CollectionList
 
-        response = self._client._client.get("/collections")
+        response = self._make_request("get", "/collections")
         response.raise_for_status()
 
         return CollectionList(**response.json())
@@ -330,7 +355,7 @@ class AlbertClient:
         """
         from albert.types import Collection
 
-        response = self._client._client.get(f"/collections/{collection_id}")
+        response = self._make_request("get", f"/collections/{collection_id}")
         response.raise_for_status()
 
         return Collection(**response.json())
@@ -378,8 +403,8 @@ class AlbertClient:
         if visibility is not None:
             body["visibility"] = visibility
 
-        response = self._client._client.patch(
-            f"/collections/{collection_id}", json=body
+        response = self._make_request(
+            "patch", f"/collections/{collection_id}", json=body
         )
         response.raise_for_status()
 
@@ -402,7 +427,7 @@ class AlbertClient:
             print("Collection deleted")
             ```
         """
-        response = self._client._client.delete(f"/collections/{collection_id}")
+        response = self._make_request("delete", f"/collections/{collection_id}")
         response.raise_for_status()
 
     # Phase 3: Documents methods
@@ -462,8 +487,8 @@ class AlbertClient:
         # Open and upload file
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, "application/octet-stream")}
-            response = self._client._client.post(
-                "/documents", data=form_data, files=files
+            response = self._make_request(
+                "post", "/documents", data=form_data, files=files
             )
             response.raise_for_status()
 
@@ -498,7 +523,7 @@ class AlbertClient:
         if collection_id is not None:
             params["collection"] = collection_id
 
-        response = self._client._client.get("/documents", params=params)
+        response = self._make_request("get", "/documents", params=params)
         response.raise_for_status()
 
         return DocumentList(**response.json())
@@ -524,7 +549,7 @@ class AlbertClient:
         """
         from albert.types import Document
 
-        response = self._client._client.get(f"/documents/{document_id}")
+        response = self._make_request("get", f"/documents/{document_id}")
         response.raise_for_status()
 
         return Document(**response.json())
@@ -546,7 +571,7 @@ class AlbertClient:
             print("Document deleted")
             ```
         """
-        response = self._client._client.delete(f"/documents/{document_id}")
+        response = self._make_request("delete", f"/documents/{document_id}")
         response.raise_for_status()
 
     # Phase 3: Chunks methods
@@ -574,7 +599,7 @@ class AlbertClient:
         """
         from albert.types import ChunkList
 
-        response = self._client._client.get(f"/chunks/{document_id}")
+        response = self._make_request("get", f"/chunks/{document_id}")
         response.raise_for_status()
 
         return ChunkList(**response.json())
@@ -601,7 +626,7 @@ class AlbertClient:
         """
         from albert.types import Chunk
 
-        response = self._client._client.get(f"/chunks/{document_id}/{chunk_id}")
+        response = self._make_request("get", f"/chunks/{document_id}/{chunk_id}")
         response.raise_for_status()
 
         return Chunk(**response.json())
@@ -644,7 +669,7 @@ class AlbertClient:
         if end_date is not None:
             params["end_date"] = end_date
 
-        response = self._client._client.get("/me/usage", params=params)
+        response = self._make_request("get", "/me/usage", params=params)
         response.raise_for_status()
 
         return UsageList(**response.json())
@@ -713,7 +738,7 @@ class AlbertClient:
         # Add any additional kwargs
         body.update(kwargs)
 
-        response = self._client._client.post("/ocr", json=body)
+        response = self._make_request("post", "/ocr", json=body)
         response.raise_for_status()
 
         return OCRResponse(**response.json())
@@ -766,8 +791,8 @@ class AlbertClient:
         # Open and upload file
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, "application/octet-stream")}
-            response = self._client._client.post(
-                "/ocr-beta", data=form_data, files=files
+            response = self._make_request(
+                "post", "/ocr-beta", data=form_data, files=files
             )
             response.raise_for_status()
 
@@ -828,8 +853,8 @@ class AlbertClient:
         # Open and upload file
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, "application/octet-stream")}
-            response = self._client._client.post(
-                "/parse-beta", data=form_data, files=files
+            response = self._make_request(
+                "post", "/parse-beta", data=form_data, files=files
             )
             response.raise_for_status()
 
@@ -877,7 +902,7 @@ class AlbertClient:
         # Open and upload file
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, "application/octet-stream")}
-            response = self._client._client.post("/files", data=form_data, files=files)
+            response = self._make_request("post", "/files", data=form_data, files=files)
             response.raise_for_status()
 
         return FileUploadResponse(**response.json())
@@ -901,7 +926,7 @@ class AlbertClient:
         """
         from albert.types import HealthStatus
 
-        response = self._client._client.get("/health")
+        response = self._make_request("get", "/health")
         response.raise_for_status()
 
         return HealthStatus(**response.json())
@@ -926,7 +951,7 @@ class AlbertClient:
         """
         from albert.types import MetricsData
 
-        response = self._client._client.get("/metrics")
+        response = self._make_request("get", "/metrics")
         response.raise_for_status()
 
         return MetricsData(**response.json())
