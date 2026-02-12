@@ -163,12 +163,10 @@ class TestUpdateCollection:
     """Test update_collection method."""
 
     @respx.mock
-    def test_update_collection_name(self, client, base_url, mock_collection):
+    def test_update_collection_name(self, client, base_url):
         """Test updating collection name."""
-        updated_collection = {**mock_collection, "name": "Updated Name"}
-
         mock_route = respx.patch(f"{base_url.rstrip('/')}/collections/123").mock(
-            return_value=Response(200, json=updated_collection)
+            return_value=Response(204)
         )
 
         result = client.update_collection(123, name="Updated Name")
@@ -177,30 +175,20 @@ class TestUpdateCollection:
         request_body = mock_route.calls.last.request.content.decode()
         assert "Updated Name" in request_body
 
-        assert isinstance(result, Collection)
-        assert result.name == "Updated Name"
+        assert result is None
 
     @respx.mock
-    def test_update_collection_multiple_fields(self, client, base_url, mock_collection):
+    def test_update_collection_multiple_fields(self, client, base_url):
         """Test updating multiple collection fields."""
-        updated = {
-            **mock_collection,
-            "name": "New Name",
-            "description": "New Description",
-            "visibility": "public",
-        }
-
         respx.patch(f"{base_url.rstrip('/')}/collections/123").mock(
-            return_value=Response(200, json=updated)
+            return_value=Response(204)
         )
 
         result = client.update_collection(
             123, name="New Name", description="New Description", visibility="public"
         )
 
-        assert result.name == "New Name"
-        assert result.description == "New Description"
-        assert result.visibility == "public"
+        assert result is None
 
     @respx.mock
     def test_update_collection_http_error(self, client, base_url):

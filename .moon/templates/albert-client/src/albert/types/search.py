@@ -1,78 +1,115 @@
-"""Search and rerank types for Albert API.
+"""Types for Albert API Search and Rerank endpoints."""
 
-Models for hybrid RAG search and BGE reranking endpoints.
-"""
+from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from albert._models import BaseModel
 
+# Search method types
+SearchMethod = Literal["hybrid", "semantic", "lexical"]
 
-# Search types
+
+# --- Usage (inline, used in search/rerank responses) ---
+
+
+class CarbonFootprintUsageKWh(BaseModel):
+    """Carbon footprint in kWh."""
+
+    min: float = 0.0
+    max: float = 0.0
+
+
+class CarbonFootprintUsageKgCO2eq(BaseModel):
+    """Carbon footprint in kgCO2eq."""
+
+    min: float = 0.0
+    max: float = 0.0
+
+
+class CarbonFootprintUsage(BaseModel):
+    """Carbon footprint usage."""
+
+    kWh: CarbonFootprintUsageKWh | None = None
+    kgCO2eq: CarbonFootprintUsageKgCO2eq | None = None
+
+
+class Usage(BaseModel):
+    """Inline usage information returned in API responses."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cost: float = 0.0
+    carbon: CarbonFootprintUsage | None = None
+    requests: int = 0
+
+
+# --- Chunks ---
 
 
 class Chunk(BaseModel):
-    """A chunk of text from a document in a collection."""
+    """A chunk of a document."""
 
-    object: Literal["chunk"] = "chunk"
+    object: str = "chunk"
     id: int
-    metadata: dict[str, Any]
+    collection_id: int
+    document_id: int
     content: str
+    metadata: dict | None = None
+    created: int | None = None
 
 
 class ChunkList(BaseModel):
-    """Response from listing chunks."""
+    """List of chunks."""
 
-    object: Literal["list"] = "list"
-    data: list[Chunk]
+    object: str = "list"
+    data: list[Chunk] = []
 
 
-SearchMethod = Literal["hybrid", "semantic", "lexical"]
-"""Search method: hybrid (semantic + lexical), semantic only, or lexical only."""
+# --- Search ---
 
 
 class SearchResult(BaseModel):
-    """A single search result from Albert API."""
+    """A single search result with method, score, and chunk."""
 
     method: SearchMethod
     score: float
     chunk: Chunk
 
 
-class Usage(BaseModel):
-    """Usage information for a request."""
-
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    cost: float = 0.0
-    carbon: dict[str, Any] | None = None  # Carbon footprint details
-    requests: int = 0
-
-
 class SearchResponse(BaseModel):
-    """Response from /v1/search endpoint."""
+    """Response from the search endpoint."""
 
-    object: Literal["list"] = "list"
-    data: list[SearchResult]
+    object: str = "list"
+    data: list[SearchResult] = []
     usage: Usage | None = None
 
 
-# Rerank types
+# --- Rerank ---
+
+
+class Rerank(BaseModel):
+    """Deprecated rerank result format (in `data` field)."""
+
+    object: str = "rerank"
+    score: float
+    index: int
 
 
 class RerankResult(BaseModel):
-    """A single reranked document result."""
+    """A single rerank result with relevance score and original index."""
 
     relevance_score: float
-    index: int  # Original position in input list
+    index: int
 
 
 class RerankResponse(BaseModel):
-    """Response from /v1/rerank endpoint."""
+    """Response from the rerank endpoint."""
 
-    object: Literal["list"] = "list"
+    object: str = "list"
     id: str
-    results: list[RerankResult]
+    data: list[Rerank] = []
+    results: list[RerankResult] = []
     model: str
     usage: Usage | None = None

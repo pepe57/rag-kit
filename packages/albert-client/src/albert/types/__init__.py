@@ -1,4 +1,7 @@
-"""Albert API response types (Phase 2+)."""
+"""Albert API type definitions.
+
+All Pydantic models for Albert API responses are defined here.
+"""
 
 from albert.types.collections import (
     Collection,
@@ -6,10 +9,15 @@ from albert.types.collections import (
     CollectionVisibility,
     Document,
     DocumentList,
+    DocumentResponse,
 )
 from albert.types.search import (
+    CarbonFootprintUsage,
+    CarbonFootprintUsageKgCO2eq,
+    CarbonFootprintUsageKWh,
     Chunk,
     ChunkList,
+    Rerank,
     RerankResponse,
     RerankResult,
     SearchMethod,
@@ -18,50 +26,56 @@ from albert.types.search import (
     Usage,
 )
 from albert.types.tools import (
-    BoundingBox,
+    FileResponse,
     FileUploadResponse,
-    HealthStatus,
-    MetricsData,
+    MetricsUsage,
+    OCRImageObject,
+    OCRPageDimensions,
     OCRPageObject,
     OCRResponse,
-    OCRText,
     OCRUsage,
     ParsedDocument,
-    ParsedDocumentOutputFormat,
+    ParsedDocumentMetadata,
     ParsedDocumentPage,
+    UsageDetail,
     UsageList,
     UsageRecord,
 )
 
-
 __all__ = [
-    # Search & Rerank
-    "Chunk",
-    "ChunkList",
-    "RerankResult",
-    "RerankResponse",
-    "SearchMethod",
-    "SearchResult",
-    "SearchResponse",
-    "Usage",
-    # Collections & Documents
+    # Collections
     "Collection",
     "CollectionList",
     "CollectionVisibility",
     "Document",
     "DocumentList",
-    # Tools, Parsing & Monitoring
-    "BoundingBox",
+    "DocumentResponse",
+    # Search
+    "CarbonFootprintUsage",
+    "CarbonFootprintUsageKgCO2eq",
+    "CarbonFootprintUsageKWh",
+    "Chunk",
+    "ChunkList",
+    "Rerank",
+    "RerankResponse",
+    "RerankResult",
+    "SearchMethod",
+    "SearchResponse",
+    "SearchResult",
+    "Usage",
+    # Tools / OCR / Parse / Files
+    "FileResponse",
     "FileUploadResponse",
-    "HealthStatus",
-    "MetricsData",
+    "MetricsUsage",
+    "OCRImageObject",
+    "OCRPageDimensions",
     "OCRPageObject",
     "OCRResponse",
-    "OCRText",
     "OCRUsage",
     "ParsedDocument",
-    "ParsedDocumentOutputFormat",
+    "ParsedDocumentMetadata",
     "ParsedDocumentPage",
+    "UsageDetail",
     "UsageList",
     "UsageRecord",
 ]

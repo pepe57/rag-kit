@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from openai import OpenAI
-
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,12 +19,10 @@ if TYPE_CHECKING:
         CollectionVisibility,
         Document,
         DocumentList,
-        FileUploadResponse,
-        HealthStatus,
-        MetricsData,
+        DocumentResponse,
+        FileResponse,
         OCRResponse,
         ParsedDocument,
-        ParsedDocumentOutputFormat,
         RerankResponse,
         SearchResponse,
         UsageList,
@@ -54,7 +51,7 @@ class AlbertClient:
             messages=[{"role": "user", "content": "Hello!"}]
         )
 
-        # Albert-specific endpoints (coming in Phase 2+)
+        # Albert-specific endpoints
         # results = client.search(prompt="...", collections=["..."])
         ```
 
@@ -98,11 +95,15 @@ class AlbertClient:
         self.audio = self._client.audio
         self.models = self._client.models
 
-        # Albert-Specific Resources (will be implemented in Phase 2+)
-        # self.collections = Collections(self._client)
-        # self.documents = Documents(self._client)
-        # self.tools = Tools(self._client)
-        # self.management = Management(self._client)
+    def close(self) -> None:
+        """Close the underlying client."""
+        self._client.close()
+
+    def __enter__(self) -> "AlbertClient":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
     @property
     def api_key(self) -> str:
@@ -140,7 +141,7 @@ class AlbertClient:
         http_method = getattr(self._client._client, method)
         return http_method(path, **kwargs)
 
-    # Phase 2: Search and Rerank methods
+    # Search and Rerank methods
 
     def search(
         self,
@@ -175,14 +176,13 @@ class AlbertClient:
         Example:
             ```python
             results = client.search(
-                prompt="Loi Énergie Climat",
-                collections=["col_123"],
+                prompt="Code civil",
+                collections=["legal_docs"],
                 limit=5,
                 method="hybrid"
             )
-            for result in results.data:
-                print(f"Score: {result.score:.3f}")
-                print(f"Content: {result.chunk.content[:100]}...")
+            for chunk in results.data:
+                print(chunk.score, chunk.chunk.content)
             ```
         """
         from albert.types import SearchResponse
@@ -216,7 +216,6 @@ class AlbertClient:
         """Rerank documents by relevance to a query using BGE reranker.
 
         Takes a list of documents and reorders them by relevance to the query.
-        Useful for improving RAG retrieval quality.
 
         Args:
             query: The search query to rank documents against.
@@ -229,22 +228,6 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the API request fails.
-
-        Example:
-            ```python
-            results = client.rerank(
-                query="transition énergétique",
-                documents=[
-                    "La loi Énergie Climat vise à...",
-                    "Le changement climatique est...",
-                    "Les énergies renouvelables..."
-                ],
-                model="BAAI/bge-reranker-v2-m3",
-                top_n=2
-            )
-            for result in results.results:
-                print(f"Rank {result.index}: Score {result.relevance_score:.3f}")
-            ```
         """
         from albert.types import RerankResponse
 
@@ -264,7 +247,7 @@ class AlbertClient:
         # Parse and return Pydantic model
         return RerankResponse(**response.json())
 
-    # Phase 3: Collections methods
+    # Collections methods
 
     def create_collection(
         self,
@@ -273,9 +256,6 @@ class AlbertClient:
         visibility: CollectionVisibility = "private",
     ) -> Collection:
         """Create a new RAG collection.
-
-        Collections organize documents for semantic search. Each collection has its
-        own embedding model and access permissions.
 
         Args:
             name: Name of the collection (required).
@@ -287,16 +267,6 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the API request fails.
-
-        Example:
-            ```python
-            collection = client.create_collection(
-                name="French Legal Documents",
-                description="Collection of French government legal texts",
-                visibility="private"
-            )
-            print(f"Created collection {collection.id}")
-            ```
         """
         from albert.types import Collection
 
@@ -311,27 +281,36 @@ class AlbertClient:
 
         return Collection(**response.json())
 
-    def list_collections(self) -> CollectionList:
+    def list_collections(
+        self,
+        name: str | None = None,
+        visibility: CollectionVisibility | None = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> CollectionList:
         """List all accessible collections.
 
-        Returns collections owned by the user plus any public collections.
+        Args:
+            name: Filter by collection name (optional).
+            visibility: Filter by collection visibility (optional).
+            limit: Maximum number of collections to return. Defaults to 10.
+            offset: Pagination offset. Defaults to 0.
 
         Returns:
             CollectionList containing all accessible collections.
 
         Raises:
             httpx.HTTPStatusError: If the API request fails.
-
-        Example:
-            ```python
-            collections = client.list_collections()
-            for collection in collections.data:
-                print(f"{collection.name}: {collection.documents} documents")
-            ```
         """
         from albert.types import CollectionList
 
-        response = self._make_request("get", "/collections")
+        params = {"limit": limit, "offset": offset}
+        if name is not None:
+            params["name"] = name
+        if visibility is not None:
+            params["visibility"] = visibility
+
+        response = self._make_request("get", "/collections", params=params)
         response.raise_for_status()
 
         return CollectionList(**response.json())
@@ -347,13 +326,6 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the collection doesn't exist or isn't accessible.
-
-        Example:
-            ```python
-            collection = client.get_collection(123)
-            print(f"Collection: {collection.name}")
-            print(f"Documents: {collection.documents}")
-            ```
         """
         from albert.types import Collection
 
@@ -368,7 +340,7 @@ class AlbertClient:
         name: str | None = None,
         description: str | None = None,
         visibility: CollectionVisibility | None = None,
-    ) -> Collection:
+    ) -> None:
         """Update a collection's metadata.
 
         Only the collection owner can update it. At least one field must be provided.
@@ -379,23 +351,9 @@ class AlbertClient:
             description: New description (optional).
             visibility: New visibility setting (optional).
 
-        Returns:
-            Updated Collection object.
-
         Raises:
-            httpx.HTTPStatusError: If the update fails or user lacks permission.
-
-        Example:
-            ```python
-            updated = client.update_collection(
-                123,
-                name="Updated Collection Name",
-                visibility="public"
-            )
-            ```
+            httpx.HTTPStatusError: If the update fails (e.g. 404, 403).
         """
-        from albert.types import Collection
-
         # Build request body with only provided fields
         body = {}
         if name is not None:
@@ -410,8 +368,6 @@ class AlbertClient:
         )
         response.raise_for_status()
 
-        return Collection(**response.json())
-
     def delete_collection(self, collection_id: int) -> None:
         """Delete a collection and all its documents.
 
@@ -422,17 +378,11 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the deletion fails or user lacks permission.
-
-        Example:
-            ```python
-            client.delete_collection(123)
-            print("Collection deleted")
-            ```
         """
         response = self._make_request("delete", f"/collections/{collection_id}")
         response.raise_for_status()
 
-    # Phase 3: Documents methods
+    # Documents methods
 
     def upload_document(
         self,
@@ -440,22 +390,32 @@ class AlbertClient:
         collection_id: int,
         chunk_size: int = 2048,
         chunk_overlap: int = 0,
-        **kwargs,
-    ) -> Document:
+        chunker: str = "RecursiveCharacterTextSplitter",
+        chunk_min_size: int = 0,
+        separators: list[str] | None = None,
+        preset_separators: str | None = None,
+        is_separator_regex: bool = False,
+        metadata: str | None = None,
+    ) -> DocumentResponse:
         """Upload a document to a collection.
 
         The document will be parsed, chunked, and embedded according to the collection's
-        settings. Supports PDF, DOCX, TXT, and other common formats.
+        settings.
 
         Args:
             file_path: Path to the file to upload.
             collection_id: The collection ID to add the document to.
             chunk_size: Size of text chunks for embedding (default: 2048).
             chunk_overlap: Overlap between chunks (default: 0).
-            **kwargs: Additional upload parameters (page_range, force_ocr, etc.).
+            chunker: Chunker strategy (default: "RecursiveCharacterTextSplitter").
+            chunk_min_size: Minimum chunk size (default: 0).
+            separators: List of custom separators.
+            preset_separators: Preset generic separators (e.g. "markdown").
+            is_separator_regex: Treat separators as regex? (default: False).
+            metadata: Stringified JSON object matching the Metadata schema.
 
         Returns:
-            Document object with ID and metadata.
+            DocumentResponse with document ID.
 
         Raises:
             httpx.HTTPStatusError: If the upload fails.
@@ -463,16 +423,17 @@ class AlbertClient:
         Example:
             ```python
             doc = client.upload_document(
-                file_path="./legal_doc.pdf",
+                file_path="report.pdf",
                 collection_id=123,
-                chunk_size=1024
+                chunk_size=1000,
+                metadata='{"category": "finance"}'
             )
-            print(f"Uploaded document {doc.id} with {doc.chunks} chunks")
+            print(f"Uploaded document ID: {doc.id}")
             ```
         """
         from pathlib import Path
 
-        from albert.types import Document
+        from albert.types import DocumentResponse
 
         # Convert to Path object
         file_path = Path(file_path)
@@ -482,9 +443,19 @@ class AlbertClient:
             "collection": collection_id,
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
+            "chunker": chunker,
+            "chunk_min_size": chunk_min_size,
+            "is_separator_regex": is_separator_regex,
         }
-        # Add any additional parameters
-        form_data.update(kwargs)
+        if separators is not None:
+            # For list items in multipart form data, we might need multiple keys
+            # or JSON serialization depending on API expectation.
+            # Assuming standard "separators" list field here.
+            form_data["separators"] = separators
+        if preset_separators is not None:
+            form_data["preset_separators"] = preset_separators
+        if metadata is not None:
+            form_data["metadata"] = metadata
 
         # Open and upload file
         with open(file_path, "rb") as f:
@@ -494,36 +465,40 @@ class AlbertClient:
             )
             response.raise_for_status()
 
-        return Document(**response.json())
+        return DocumentResponse(**response.json())
 
-    def list_documents(self, collection_id: int | None = None) -> DocumentList:
+    def list_documents(
+        self,
+        collection_id: int | None = None,
+        name: str | None = None,
+        limit: int | None = 10,
+        offset: int | str = 0,
+    ) -> DocumentList:
         """List documents in a collection or all accessible documents.
 
         Args:
-            collection_id: Filter to specific collection. If None, returns all accessible documents.
+            collection_id: Filter to specific collection.
+            name: Filter by document name.
+            limit: Max results (default: 10).
+            offset: Pagination offset (default: 0).
 
         Returns:
             DocumentList containing matching documents.
 
         Raises:
             httpx.HTTPStatusError: If the request fails.
-
-        Example:
-            ```python
-            # List all documents in a collection
-            docs = client.list_documents(collection_id=123)
-            for doc in docs.data:
-                print(f"{doc.name}: {doc.chunks} chunks")
-
-            # List all accessible documents
-            all_docs = client.list_documents()
-            ```
         """
         from albert.types import DocumentList
 
         params = {}
         if collection_id is not None:
             params["collection"] = collection_id
+        if name is not None:
+            params["name"] = name
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
 
         response = self._make_request("get", "/documents", params=params)
         response.raise_for_status()
@@ -541,13 +516,6 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the document doesn't exist or isn't accessible.
-
-        Example:
-            ```python
-            doc = client.get_document(456)
-            print(f"Document: {doc.name}")
-            print(f"Chunks: {doc.chunks}")
-            ```
         """
         from albert.types import Document
 
@@ -559,49 +527,42 @@ class AlbertClient:
     def delete_document(self, document_id: int) -> None:
         """Delete a document and all its chunks.
 
-        This action is irreversible. The document's embeddings will also be removed.
+        This action is irreversible.
 
         Args:
             document_id: The document ID to delete.
 
         Raises:
             httpx.HTTPStatusError: If the deletion fails.
-
-        Example:
-            ```python
-            client.delete_document(456)
-            print("Document deleted")
-            ```
         """
         response = self._make_request("delete", f"/documents/{document_id}")
         response.raise_for_status()
 
-    # Phase 3: Chunks methods
+    # Chunks methods
 
-    def list_chunks(self, document_id: int) -> ChunkList:
-        """List all chunks for a specific document.
-
-        Returns the text chunks that were created when the document was uploaded.
+    def list_chunks(
+        self,
+        document_id: int,
+        limit: int = 10,
+        offset: int | str = 0,
+    ) -> ChunkList:
+        """List chunks for a specific document.
 
         Args:
             document_id: The document ID.
+            limit: Max results (default: 10).
+            offset: Pagination offset (default: 0).
 
         Returns:
-            ChunkList containing all chunks for the document.
+            ChunkList containing chunks.
 
         Raises:
             httpx.HTTPStatusError: If the request fails.
-
-        Example:
-            ```python
-            chunks = client.list_chunks(document_id=456)
-            for chunk in chunks.data:
-                print(f"Chunk {chunk.id}: {chunk.content[:100]}...")
-            ```
         """
         from albert.types import ChunkList
 
-        response = self._make_request("get", f"/chunks/{document_id}")
+        params = {"limit": limit, "offset": offset}
+        response = self._make_request("get", f"/chunks/{document_id}", params=params)
         response.raise_for_status()
 
         return ChunkList(**response.json())
@@ -618,13 +579,6 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the chunk doesn't exist.
-
-        Example:
-            ```python
-            chunk = client.get_chunk(document_id=456, chunk_id=123)
-            print(chunk.content)
-            print(chunk.metadata)
-            ```
         """
         from albert.types import Chunk
 
@@ -633,50 +587,62 @@ class AlbertClient:
 
         return Chunk(**response.json())
 
-    # Phase 4: Usage tracking
+    # Usage tracking
 
     def get_usage(
-        self, start_date: str | None = None, end_date: str | None = None
+        self,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        limit: int = 10,
+        offset: int = 0,
+        endpoint: str | None = None,
     ) -> UsageList:
         """Get API usage statistics.
 
-        Returns usage data (tokens, cost, carbon) aggregated by date.
+        Returns usage data aggregated by request.
 
         Args:
-            start_date: Filter from this date (ISO format YYYY-MM-DD). Optional.
-            end_date: Filter until this date (ISO format YYYY-MM-DD). Optional.
+            start_time: Filter from this timestamp (Unix seconds). Optional.
+            end_time: Filter until this timestamp (Unix seconds). Optional.
+            limit: Max results. Default 10.
+            offset: Pagination offset. Default 0.
+            endpoint: Filter by endpoint API path.
 
         Returns:
-            UsageList with usage records per date.
+            UsageList with usage records.
 
         Raises:
             httpx.HTTPStatusError: If the request fails.
 
         Example:
             ```python
-            # Get all usage
-            usage = client.get_usage()
+            # Get usage for the last 24 hours
+            import time
+            now = int(time.time())
+            usage = client.get_usage(
+                start_time=now - 86400,
+                end_time=now
+            )
             for record in usage.data:
-                print(f"{record.date}: {record.total_tokens} tokens, ${record.cost}")
-
-            # Get usage for date range
-            usage = client.get_usage(start_date="2024-01-01", end_date="2024-01-31")
+                print(f"{record.model}: {record.usage.total_tokens} tokens")
             ```
         """
         from albert.types import UsageList
 
-        params = {}
-        if start_date is not None:
-            params["start_date"] = start_date
-        if end_date is not None:
-            params["end_date"] = end_date
+        params = {"limit": limit, "offset": offset}
+        if start_time is not None:
+            params["start_time"] = start_time
+        if end_time is not None:
+            params["end_time"] = end_time
+        if endpoint is not None:
+            params["endpoint"] = endpoint
 
         response = self._make_request("get", "/me/usage", params=params)
         response.raise_for_status()
 
         return UsageList(**response.json())
 
-    # Phase 4: OCR & Parsing methods
+    # OCR & Parsing methods
 
     def ocr(
         self,
@@ -684,40 +650,28 @@ class AlbertClient:
         model: str | None = None,
         pages: list[int] | None = None,
         include_image_base64: bool = False,
+        image_limit: int | None = None,
+        image_min_size: int | None = None,
         **kwargs,
     ) -> OCRResponse:
         """Perform OCR on a document with advanced options.
 
-        Advanced OCR with support for JSON mode, bounding boxes, and image extraction.
-
         Args:
             document: Document to OCR. Can be:
-                - Dict with 'url' key for document URL
-                - Dict with 'image_url' key for image URL
+                - Dict with 'url', 'image_url', or 'document_url' key
                 - Direct URL string
             model: Model to use for OCR (optional).
-            pages: Specific pages to process (0-indexed). If None, processes all pages.
+            pages: Specific pages to process (0-indexed).
             include_image_base64: Include base64-encoded images in response.
-            **kwargs: Additional OCR options (bbox_annotation_format,
-                document_annotation_format, etc.).
+            image_limit: Max images to extract.
+            image_min_size: Min size of images to extract.
+            **kwargs: Additional OCR options.
 
         Returns:
             OCRResponse with pages, text, and optional bounding boxes.
 
         Raises:
             httpx.HTTPStatusError: If the OCR request fails.
-
-        Example:
-            ```python
-            # OCR from URL
-            result = client.ocr(
-                document="https://example.com/doc.pdf",
-                pages=[0, 1, 2],
-                include_image_base64=True
-            )
-            for page in result.pages:
-                print(f"Page {page.page}: {page.text}")
-            ```
         """
         from albert.types import OCRResponse
 
@@ -726,7 +680,7 @@ class AlbertClient:
 
         # Handle document parameter
         if isinstance(document, str):
-            body["document"] = {"url": document}
+            body["document"] = {"document_url": document}
         else:
             body["document"] = document
 
@@ -736,6 +690,10 @@ class AlbertClient:
             body["pages"] = pages
         if include_image_base64:
             body["include_image_base64"] = include_image_base64
+        if image_limit is not None:
+            body["image_limit"] = image_limit
+        if image_min_size is not None:
+            body["image_min_size"] = image_min_size
 
         # Add any additional kwargs
         body.update(kwargs)
@@ -754,30 +712,17 @@ class AlbertClient:
     ) -> ParsedDocument:
         """Perform simple file-based OCR (beta).
 
-        Simpler OCR method that takes a file and returns parsed text.
-
         Args:
             file_path: Path to the file to OCR.
             model: Model to use for OCR (required).
-            dpi: DPI for rendering pages as images (100-600, default: 150).
-            prompt: Custom prompt for OCR extraction (optional).
+            dpi: DPI for rendering pages (100-600, default: 150).
+            prompt: Custom prompt for OCR extraction.
 
         Returns:
             ParsedDocument with OCR results per page.
 
         Raises:
             httpx.HTTPStatusError: If the OCR request fails.
-
-        Example:
-            ```python
-            result = client.ocr_beta(
-                file_path="./scanned_doc.pdf",
-                model="gpt-4o-mini",
-                dpi=300
-            )
-            for page in result.data:
-                print(f"Page {page.page}: {page.content}")
-            ```
         """
         from pathlib import Path
 
@@ -803,40 +748,21 @@ class AlbertClient:
     def parse(
         self,
         file_path: str | Path,
-        output_format: ParsedDocumentOutputFormat = "markdown",
         force_ocr: bool = False,
         page_range: str = "",
-        paginate_output: bool = False,
     ) -> ParsedDocument:
-        """Parse a document to markdown, JSON, or HTML.
-
-        Extract and convert document content to structured format.
+        """Parse a document to markdown.
 
         Args:
             file_path: Path to the file to parse.
-            output_format: Output format - "markdown", "json", or "html" (default: "markdown").
             force_ocr: Force OCR on all pages (default: False).
-            page_range: Page range to convert (e.g., "0,5-10,20"). Empty = all pages.
-            paginate_output: Separate pages with horizontal rules containing page numbers.
+            page_range: Page range (e.g., "0,5-10,20"). Empty = all pages.
 
         Returns:
             ParsedDocument with parsed pages.
 
         Raises:
             httpx.HTTPStatusError: If the parsing fails.
-
-        Example:
-            ```python
-            # Parse to markdown
-            result = client.parse(
-                file_path="./document.pdf",
-                output_format="markdown",
-                page_range="0-5"
-            )
-            for page in result.data:
-                print(f"Page {page.page}:")
-                print(page.content)
-            ```
         """
         from pathlib import Path
 
@@ -846,10 +772,8 @@ class AlbertClient:
 
         # Build form data
         form_data = {
-            "output_format": output_format,
             "force_ocr": force_ocr,
             "page_range": page_range,
-            "paginate_output": paginate_output,
         }
 
         # Open and upload file
@@ -862,98 +786,70 @@ class AlbertClient:
 
         return ParsedDocument(**response.json())
 
-    # Phase 4: File management
+    # File management (Deprecated)
 
     def upload_file(
         self, file_path: str | Path, purpose: str | None = None
-    ) -> FileUploadResponse:
-        """Upload a file to Albert API.
+    ) -> FileResponse:
+        """[DEPRECATED] Upload a file to Albert API.
 
-        Generic file upload (different from uploading documents to collections).
+        This endpoint is deprecated. Use `upload_document` for RAG or `ocr_beta` for OCR.
 
         Args:
             file_path: Path to the file to upload.
             purpose: Purpose of the file upload (optional).
 
         Returns:
-            FileUploadResponse with file ID and metadata.
+            FileResponse with file ID.
 
         Raises:
             httpx.HTTPStatusError: If the upload fails.
-
-        Example:
-            ```python
-            result = client.upload_file(
-                file_path="./data.json",
-                purpose="analysis"
-            )
-            print(f"Uploaded file ID: {result.id}")
-            ```
         """
         from pathlib import Path
 
-        from albert.types import FileUploadResponse
+        from albert.types import FileResponse
 
         file_path = Path(file_path)
 
         # Build form data
         form_data = {}
-        if purpose is not None:
-            form_data["purpose"] = purpose
+        # 'purpose' is not in the deprecated /v1/files spec body anymore,
+        # but kept here if API still accepts it or for backward compat structure.
+        # The spec shows 'request' JSON + 'file'.
+        # For simplicity, sending multipart/form-data as before, but checking spec...
+        # Spec says multipart/form-data with 'file' and 'request' ($ref FilesRequest).
+        # We'll mimic the old behavior but warn it's deprecated.
 
         # Open and upload file
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, "application/octet-stream")}
+            # If server creates 'request' param automatically or accepts loose form fields:
+            if purpose:
+                form_data["purpose"] = purpose
+
             response = self._make_request("post", "/files", data=form_data, files=files)
             response.raise_for_status()
 
-        return FileUploadResponse(**response.json())
+        return FileResponse(**response.json())
 
-    # Phase 4: Health & Monitoring
+    # Health & Monitoring
 
-    def health_check(self) -> HealthStatus:
+    def health_check(self) -> dict[str, Any]:
         """Check API health status.
 
         Returns:
-            HealthStatus with current API status.
-
-        Raises:
-            httpx.HTTPStatusError: If the health check fails.
-
-        Example:
-            ```python
-            health = client.health_check()
-            print(f"API Status: {health.status}")
-            ```
+            Dict with health info (schema undefined in spec).
         """
-        from albert.types import HealthStatus
-
         response = self._make_request("get", "/health")
         response.raise_for_status()
+        return response.json()
 
-        return HealthStatus(**response.json())
-
-    def get_metrics(self) -> MetricsData:
+    def get_metrics(self) -> dict[str, Any]:
         """Get API metrics.
 
-        Returns performance and usage metrics for the API.
-
         Returns:
-            MetricsData with API metrics.
-
-        Raises:
-            httpx.HTTPStatusError: If the metrics request fails.
-
-        Example:
-            ```python
-            metrics = client.get_metrics()
-            print(f"Requests/sec: {metrics.requests_per_second}")
-            print(f"Avg latency: {metrics.average_latency_ms}ms")
-            ```
+            Dict with metrics info (schema undefined in spec).
         """
-        from albert.types import MetricsData
-
         response = self._make_request("get", "/metrics")
         response.raise_for_status()
-
-        return MetricsData(**response.json())
+        return response.json()

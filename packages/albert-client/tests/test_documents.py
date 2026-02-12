@@ -7,7 +7,7 @@ import pytest
 import respx
 from httpx import Response
 
-from albert import AlbertClient, Document, DocumentList
+from albert import AlbertClient, Document, DocumentList, DocumentResponse
 
 
 @pytest.fixture
@@ -58,27 +58,22 @@ class TestUploadDocument:
     """Test upload_document method."""
 
     @respx.mock
-    def test_upload_document_basic(self, client, base_url, mock_document, temp_file):
+    def test_upload_document_basic(self, client, base_url, temp_file):
         """Test uploading a document with default parameters."""
         respx.post(f"{base_url.rstrip('/')}/documents").mock(
-            return_value=Response(200, json=mock_document)
+            return_value=Response(200, json={"id": 456})
         )
 
         result = client.upload_document(file_path=temp_file, collection_id=123)
 
-        assert isinstance(result, Document)
+        assert isinstance(result, DocumentResponse)
         assert result.id == 456
-        assert result.name == "test_doc.pdf"
-        assert result.collection_id == 123
-        assert result.chunks == 10
 
     @respx.mock
-    def test_upload_document_with_parameters(
-        self, client, base_url, mock_document, temp_file
-    ):
+    def test_upload_document_with_parameters(self, client, base_url, temp_file):
         """Test uploading document with custom parameters."""
         respx.post(f"{base_url.rstrip('/')}/documents").mock(
-            return_value=Response(200, json=mock_document)
+            return_value=Response(200, json={"id": 456})
         )
 
         result = client.upload_document(
@@ -86,10 +81,10 @@ class TestUploadDocument:
             collection_id=123,
             chunk_size=1024,
             chunk_overlap=100,
-            page_range="1-10",
+            separators=["\n"],
         )
 
-        assert isinstance(result, Document)
+        assert isinstance(result, DocumentResponse)
         assert result.id == 456
 
     @respx.mock

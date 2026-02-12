@@ -25,8 +25,11 @@ def mock_search_response():
                 "chunk": {
                     "object": "chunk",
                     "id": 123,
+                    "collection_id": 1,
+                    "document_id": 10,
                     "metadata": {"source": "doc1.pdf", "page": 5},
                     "content": "La loi Énergie Climat vise à accélérer la transition énergétique.",
+                    "created": 1700000000,
                 },
             },
         ],

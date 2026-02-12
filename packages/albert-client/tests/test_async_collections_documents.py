@@ -1,8 +1,5 @@
 """Tests for async collections, documents, and chunks functionality."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
 import respx
 from httpx import Response
@@ -15,6 +12,7 @@ from albert import (
     CollectionList,
     Document,
     DocumentList,
+    DocumentResponse,
 )
 
 
@@ -59,22 +57,20 @@ def mock_chunk():
     return {
         "object": "chunk",
         "id": 789,
+        "collection_id": 123,
+        "document_id": 456,
         "metadata": {"page": 1, "source": "test_doc.pdf"},
         "content": "This is the content of the chunk from the document.",
+        "created": 1700000000,
     }
 
 
 @pytest.fixture
-def temp_file():
+def temp_file(tmp_path):
     """Create a temporary test file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write("Test document content\nSecond line of content.")
-        temp_path = Path(f.name)
-
-    yield temp_path
-
-    # Cleanup
-    temp_path.unlink()
+    f = tmp_path / "test.txt"
+    f.write_text("Test document content\nSecond line of content.")
+    return f
 
 
 class TestAsyncCollections:
@@ -123,17 +119,15 @@ class TestAsyncCollections:
         assert result.id == 123
 
     @respx.mock
-    async def test_update_collection(self, client, base_url, mock_collection):
+    async def test_update_collection(self, client, base_url):
         """Test async update collection."""
-        updated = {**mock_collection, "name": "Updated Name"}
-
         respx.patch(f"{base_url.rstrip('/')}/collections/123").mock(
-            return_value=Response(200, json=updated)
+            return_value=Response(204)
         )
 
         result = await client.update_collection(123, name="Updated Name")
 
-        assert result.name == "Updated Name"
+        assert result is None
 
     @respx.mock
     async def test_delete_collection(self, client, base_url):
@@ -162,17 +156,16 @@ class TestAsyncDocuments:
     """Test async documents methods."""
 
     @respx.mock
-    async def test_upload_document(self, client, base_url, mock_document, temp_file):
+    async def test_upload_document(self, client, base_url, temp_file):
         """Test async upload document."""
         respx.post(f"{base_url.rstrip('/')}/documents").mock(
-            return_value=Response(200, json=mock_document)
+            return_value=Response(200, json={"id": 456})
         )
 
         result = await client.upload_document(file_path=temp_file, collection_id=123)
 
-        assert isinstance(result, Document)
+        assert isinstance(result, DocumentResponse)
         assert result.id == 456
-        assert result.collection_id == 123
 
     @respx.mock
     async def test_list_documents(self, client, base_url, mock_document):
@@ -221,19 +214,17 @@ class TestAsyncDocuments:
         await client.delete_document(456)
 
     @respx.mock
-    async def test_documents_context_manager(
-        self, api_key, base_url, mock_document, temp_file
-    ):
+    async def test_documents_context_manager(self, api_key, base_url, temp_file):
         """Test async documents with context manager."""
         respx.post(f"{base_url.rstrip('/')}/documents").mock(
-            return_value=Response(200, json=mock_document)
+            return_value=Response(200, json={"id": 456})
         )
 
         async with AsyncAlbertClient(api_key=api_key, base_url=base_url) as client:
             result = await client.upload_document(
                 file_path=temp_file, collection_id=123
             )
-            assert isinstance(result, Document)
+            assert isinstance(result, DocumentResponse)
 
 
 class TestAsyncChunks:

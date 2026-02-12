@@ -1,17 +1,12 @@
 """Tests for async tools, parsing, and monitoring functionality."""
 
-import tempfile
-from pathlib import Path
-
 import pytest
 import respx
 from httpx import Response
 
 from albert import (
     AsyncAlbertClient,
-    FileUploadResponse,
-    HealthStatus,
-    MetricsData,
+    FileResponse,
     OCRResponse,
     ParsedDocument,
     UsageList,
@@ -25,16 +20,11 @@ def client(api_key, base_url):
 
 
 @pytest.fixture
-def temp_file():
+def temp_file(tmp_path):
     """Create a temporary test file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write("Test document content for parsing.")
-        temp_path = Path(f.name)
-
-    yield temp_path
-
-    # Cleanup
-    temp_path.unlink()
+    f = tmp_path / "test.txt"
+    f.write_text("Test document content for parsing.")
+    return f
 
 
 class TestAsyncUsageTracking:
@@ -47,13 +37,12 @@ class TestAsyncUsageTracking:
             "object": "list",
             "data": [
                 {
-                    "date": "2024-01-15",
-                    "prompt_tokens": 1000,
-                    "completion_tokens": 500,
-                    "total_tokens": 1500,
-                    "cost": 0.05,
-                    "carbon_footprint_gco2eq": 1.2,
-                    "requests": 10,
+                    "created": 1705276800,
+                    "model": "gpt-4",
+                    "usage": {
+                        "total_tokens": 1500,
+                        "cost": 0.05,
+                    },
                 }
             ],
         }
@@ -66,10 +55,10 @@ class TestAsyncUsageTracking:
 
         assert isinstance(result, UsageList)
         assert len(result.data) == 1
-        assert result.data[0].total_tokens == 1500
+        assert result.data[0].usage.total_tokens == 1500
 
     @respx.mock
-    async def test_get_usage_with_dates(self, client, base_url):
+    async def test_get_usage_with_time_range(self, client, base_url):
         """Test async get usage with date range."""
         mock_usage = {"object": "list", "data": []}
 
@@ -77,10 +66,10 @@ class TestAsyncUsageTracking:
             return_value=Response(200, json=mock_usage)
         )
 
-        result = await client.get_usage(start_date="2024-01-01", end_date="2024-01-31")
+        result = await client.get_usage(start_time=1705276800, end_time=1705363200)
 
         assert (
-            mock_route.calls.last.request.url.params.get("start_date") == "2024-01-01"
+            mock_route.calls.last.request.url.params.get("start_time") == "1705276800"
         )
         assert isinstance(result, UsageList)
 
@@ -105,7 +94,7 @@ class TestAsyncOCR:
     async def test_ocr(self, client, base_url):
         """Test async OCR."""
         mock_ocr = {
-            "pages": [{"page": 0, "text": "Extracted text"}],
+            "pages": [{"index": 0, "markdown": "Extracted text"}],
             "id": "ocr_123",
             "model": "doctr",
         }
@@ -122,7 +111,7 @@ class TestAsyncOCR:
     @respx.mock
     async def test_ocr_with_options(self, client, base_url):
         """Test async OCR with options."""
-        mock_ocr = {"pages": [{"page": 0, "text": "Page 1"}], "model": "doctr"}
+        mock_ocr = {"pages": [{"index": 0, "markdown": "Page 1"}], "model": "doctr"}
 
         respx.post(f"{base_url.rstrip('/')}/ocr").mock(
             return_value=Response(200, json=mock_ocr)
@@ -142,7 +131,12 @@ class TestAsyncOCR:
         """Test async OCR beta."""
         mock_response = {
             "object": "list",
-            "data": [{"page": 0, "content": "OCR beta result"}],
+            "data": [
+                {
+                    "content": "OCR beta result",
+                    "metadata": {"page": 0, "document_name": "test.txt"},
+                }
+            ],
         }
 
         respx.post(f"{base_url.rstrip('/')}/ocr-beta").mock(
@@ -163,7 +157,12 @@ class TestAsyncParsing:
         """Test async parse."""
         mock_parsed = {
             "object": "list",
-            "data": [{"page": 0, "content": "# Parsed content"}],
+            "data": [
+                {
+                    "content": "# Parsed content",
+                    "metadata": {"page": 0, "document_name": "test.txt"},
+                }
+            ],
         }
 
         respx.post(f"{base_url.rstrip('/')}/parse-beta").mock(
@@ -180,7 +179,12 @@ class TestAsyncParsing:
         """Test async parse with options."""
         mock_parsed = {
             "object": "list",
-            "data": [{"page": 0, "content": '{"key": "value"}'}],
+            "data": [
+                {
+                    "content": '{"key": "value"}',
+                    "metadata": {"page": 0, "document_name": "test.txt"},
+                }
+            ],
         }
 
         respx.post(f"{base_url.rstrip('/')}/parse-beta").mock(
@@ -189,7 +193,6 @@ class TestAsyncParsing:
 
         result = await client.parse(
             file_path=temp_file,
-            output_format="json",
             force_ocr=True,
             page_range="0-10",
         )
@@ -199,7 +202,15 @@ class TestAsyncParsing:
     @respx.mock
     async def test_parse_context_manager(self, api_key, base_url, temp_file):
         """Test async parse with context manager."""
-        mock_parsed = {"object": "list", "data": [{"page": 0, "content": "Content"}]}
+        mock_parsed = {
+            "object": "list",
+            "data": [
+                {
+                    "content": "Content",
+                    "metadata": {"page": 0, "document_name": "test.txt"},
+                }
+            ],
+        }
 
         respx.post(f"{base_url.rstrip('/')}/parse-beta").mock(
             return_value=Response(200, json=mock_parsed)
@@ -216,12 +227,7 @@ class TestAsyncFileUpload:
     @respx.mock
     async def test_upload_file(self, client, base_url, temp_file):
         """Test async file upload."""
-        mock_response = {
-            "id": "file_123",
-            "filename": temp_file.name,
-            "bytes": 1024,
-            "created_at": 1234567890,
-        }
+        mock_response = {"id": 123}
 
         respx.post(f"{base_url.rstrip('/')}/files").mock(
             return_value=Response(200, json=mock_response)
@@ -229,27 +235,22 @@ class TestAsyncFileUpload:
 
         result = await client.upload_file(file_path=temp_file)
 
-        assert isinstance(result, FileUploadResponse)
-        assert result.id == "file_123"
+        assert isinstance(result, FileResponse)
+        assert result.id == 123
 
     @respx.mock
     async def test_upload_file_with_purpose(self, client, base_url, temp_file):
         """Test async file upload with purpose."""
-        mock_response = {
-            "id": "file_456",
-            "filename": temp_file.name,
-            "bytes": 2048,
-            "created_at": 1234567890,
-            "purpose": "training",
-        }
+        mock_response = {"id": 456}
 
         respx.post(f"{base_url.rstrip('/')}/files").mock(
             return_value=Response(200, json=mock_response)
         )
 
         result = await client.upload_file(file_path=temp_file, purpose="training")
-
-        assert result.purpose == "training"
+        # No assertions on result.purpose returned as it's not in FileResponse anymore
+        assert isinstance(result, FileResponse)
+        assert result.id == 456
 
 
 class TestAsyncHealthMonitoring:
@@ -266,8 +267,8 @@ class TestAsyncHealthMonitoring:
 
         result = await client.health_check()
 
-        assert isinstance(result, HealthStatus)
-        assert result.status == "ok"
+        assert isinstance(result, dict)
+        assert result["status"] == "ok"
 
     @respx.mock
     async def test_get_metrics(self, client, base_url):
@@ -284,8 +285,8 @@ class TestAsyncHealthMonitoring:
 
         result = await client.get_metrics()
 
-        assert isinstance(result, MetricsData)
-        assert result.requests_total == 5000
+        assert isinstance(result, dict)
+        assert result["requests_total"] == 5000
 
     @respx.mock
     async def test_monitoring_context_manager(self, api_key, base_url):
@@ -304,5 +305,5 @@ class TestAsyncHealthMonitoring:
             health = await client.health_check()
             metrics = await client.get_metrics()
 
-            assert isinstance(health, HealthStatus)
-            assert isinstance(metrics, MetricsData)
+            assert isinstance(health, dict)
+            assert isinstance(metrics, dict)
