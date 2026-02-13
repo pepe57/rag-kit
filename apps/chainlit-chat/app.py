@@ -150,34 +150,39 @@ async def main(message: cl.Message):
 
     cur_tool_calls = []
 
-    async for part in stream:
-        if not part.choices:
-            continue
+    try:
+        async for part in stream:
+            if not part.choices:
+                continue
 
-        # Handle new tool calls
-        if part.choices[0].delta.tool_calls:
-            for tool_call_delta in part.choices[0].delta.tool_calls:
-                index = tool_call_delta.index
+            # Handle new tool calls
+            if part.choices[0].delta.tool_calls:
+                for tool_call_delta in part.choices[0].delta.tool_calls:
+                    index = tool_call_delta.index
 
-                if index == len(cur_tool_calls):
-                    cur_tool_calls.append(tool_call_delta)
-                else:
-                    # We are updating an existing tool call
-                    if tool_call_delta.id:
-                        cur_tool_calls[index].id = tool_call_delta.id
-                    if tool_call_delta.function.name:
-                        cur_tool_calls[index].function.name = (
-                            cur_tool_calls[index].function.name or ""
-                        ) + tool_call_delta.function.name
-                    if tool_call_delta.function.arguments:
-                        cur_tool_calls[index].function.arguments = (
-                            cur_tool_calls[index].function.arguments or ""
-                        ) + tool_call_delta.function.arguments
+                    if index == len(cur_tool_calls):
+                        cur_tool_calls.append(tool_call_delta)
+                    else:
+                        # We are updating an existing tool call
+                        if tool_call_delta.id:
+                            cur_tool_calls[index].id = tool_call_delta.id
+                        if tool_call_delta.function.name:
+                            cur_tool_calls[index].function.name = (
+                                cur_tool_calls[index].function.name or ""
+                            ) + tool_call_delta.function.name
+                        if tool_call_delta.function.arguments:
+                            cur_tool_calls[index].function.arguments = (
+                                cur_tool_calls[index].function.arguments or ""
+                            ) + tool_call_delta.function.arguments
 
-        # Handle content
-        if part.choices[0].delta.content:
-            token = part.choices[0].delta.content
-            await msg.stream_token(token)
+            # Handle content
+            if part.choices[0].delta.content:
+                token = part.choices[0].delta.content
+                await msg.stream_token(token)
+    except json.JSONDecodeError:
+        # Albert API occasionally sends malformed SSE events; continue
+        # with whatever content was streamed so far.
+        pass
 
     # We are done with the first stream
 
@@ -218,5 +223,8 @@ async def main(message: cl.Message):
             if part.choices[0].delta.content:
                 token = part.choices[0].delta.content
                 await msg.stream_token(token)
+
+    # Add assistant response to history for proper conversation continuity
+    message_history.append({"role": "assistant", "content": msg.content})
 
     await msg.update()
