@@ -23,7 +23,7 @@ rag-facile generate-dataset ./my-docs -o golden_dataset.jsonl -n 50 --provider l
 # Set up Albert API credentials
 export OPENAI_API_KEY="your-api-key"                # Albert API key
 export OPENAI_BASE_URL="http://localhost:8000"      # Albert API endpoint
-export OPENAI_MODEL="mistral-7b"                    # Model to use
+export OPENAI_MODEL="openweight-small"              # Model alias (see model list)
 
 # Generate Q/A pairs using your Albert instance
 rag-facile generate-dataset ./my-docs -o golden_dataset.jsonl -n 50 --provider albert

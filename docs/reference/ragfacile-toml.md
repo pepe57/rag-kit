@@ -22,6 +22,26 @@ rag-facile config set generation.temperature 0.5
 rag-facile config validate
 ```
 
+## Albert Model Aliases
+
+Albert exposes model aliases via the OpenAI-compatible `/models` endpoint. To list the current aliases:
+
+```bash
+uv run python - <<'PY'
+from albert import AlbertClient
+
+client = AlbertClient()
+for model in client.models.list().data:
+    print(model.id, "| aliases:", getattr(model, "aliases", None))
+PY
+```
+
+Common aliases used in RAG Facile:
+
+- **Generation**: `openweight-small`, `openweight-medium`, `openweight-large` (also `albert-small`, `albert-large`)
+- **Embeddings**: `openweight-embeddings` (alias: `embeddings-small`)
+- **Reranking**: `openweight-rerank` (alias: `rerank-small`)
+
 ## Minimal Example
 
 You only need to specify the settings you want to change. Everything else uses preset defaults:
@@ -88,7 +108,7 @@ preserve_metadata = true        # Keep document metadata (title, headers, pages)
 # EMBEDDING GENERATION
 # ==========================================================
 [embedding]
-model = "albert-embedding-small"  # "albert-embedding-small", "albert-embedding-large", etc.
+model = "openweight-embeddings"  # "openweight-embeddings" (alias: "embeddings-small")
 batch_size = 32                   # Chunks per batch (1–128)
 normalization = "L2"              # "L2" or "none"
 
@@ -124,7 +144,7 @@ alpha = 0.5                     # 0.0 = lexical only, 0.5 = balanced, 1.0 = sema
 # ==========================================================
 [reranking]
 enabled = true                  # Enable reranking (improves precision)
-model = "bge-reranker-large"    # "bge-reranker-large", "bge-reranker-base"
+model = "openweight-rerank"     # "openweight-rerank" (alias: "rerank-small")
 top_n = 3                       # Final chunk count after reranking (1–50)
 
 # ==========================================================
@@ -144,7 +164,7 @@ citation_style = "inline"       # "inline" or "footnote"
 # RESPONSE GENERATION
 # ==========================================================
 [generation]
-model = "openweight-medium"     # "openweight-small", "openweight-medium", "openweight-large"
+model = "openweight-medium"     # "openweight-small", "openweight-medium", "openweight-large" (aka albert-small/albert-large)
 temperature = 0.7               # 0.0 = deterministic, 2.0 = creative
 max_tokens = 1024               # Max response length (64–8192)
 streaming = true                # Enable streaming responses
@@ -182,11 +202,13 @@ rag-facile config preset apply legal    # Apply a preset
 
 ### Comparison
 
+> **Note**: Albert currently exposes a single embedding model alias (`openweight-embeddings`). Presets keep embeddings consistent while tuning other stages.
+
 | Setting | balanced | fast | accurate | legal | hr |
 |---------|----------|------|----------|-------|----|
 | **Chunking strategy** | semantic | fixed-size | semantic | paragraph | semantic |
 | **Chunk size** | 512 | 512 | 768 | 768 | 512 |
-| **Embedding model** | small | small | large | large | medium |
+| **Embedding model** | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings |
 | **Retrieval method** | hybrid | semantic | hybrid | hybrid | hybrid |
 | **top_k** | 10 | 5 | 20 | 15 | 12 |
 | **Reranking** | on | **off** | on | on | on |

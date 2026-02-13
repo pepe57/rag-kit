@@ -2,6 +2,8 @@
 
 Official Python SDK for France's [Albert API](https://albert.api.etalab.gouv.fr/) - a sovereign AI platform providing OpenAI-compatible endpoints plus French government-specific features.
 
+> **Compatibility**: This SDK targets Albert API **v0.4.0**.
+
 ## Why Use This SDK?
 
 - **OpenAI-Compatible**: Use the same code you know from OpenAI with French sovereign models
@@ -61,6 +63,22 @@ response = client.chat.completions.create(
 )
 print(response.choices[0].message.content)
 ```
+
+### Model Aliases (as of today)
+
+Albert exposes model aliases via the OpenAI-compatible `/models` endpoint:
+
+```python
+client = AlbertClient()
+for model in client.models.list().data:
+    print(model.id, "| aliases:", getattr(model, "aliases", None))
+```
+
+Common aliases used in RAG Facile:
+
+- **Generation**: `openweight-small`, `openweight-medium`, `openweight-large` (also `albert-small`, `albert-large`)
+- **Embeddings**: `openweight-embeddings` (alias: `embeddings-small`)
+- **Reranking**: `openweight-rerank` (alias: `rerank-small`)
 
 ### Hybrid Search + Reranking
 
