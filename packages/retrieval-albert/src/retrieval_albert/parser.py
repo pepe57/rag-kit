@@ -24,27 +24,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# File types supported by Albert's parse API (/parse-beta).
+# File types supported by Albert API (OpenGateLLM).
+# See: https://docs.opengatellm.org/docs/functionalities/document-management/parsing-and-chunking
 # context_loader reads this to know which extensions to route here.
 SUPPORTED_EXTENSIONS: list[str] = [
     ".pdf",
-    ".docx",
-    ".doc",
-    ".pptx",
-    ".ppt",
-    ".xlsx",
-    ".xls",
-    ".odt",
-    ".ods",
-    ".odp",
-    ".html",
-    ".htm",
+    ".json",
     ".md",
-    ".txt",
-    ".csv",
-    ".rtf",
-    ".epub",
+    ".html",
 ]
+
+# MIME types for file picker dialogs (Chainlit, Reflex).
+ACCEPTED_MIME_TYPES: dict[str, list[str]] = {
+    "application/pdf": [".pdf"],
+    "application/json": [".json"],
+    "text/markdown": [".md"],
+    "text/html": [".html", ".htm"],
+}
 
 
 def _get_client() -> AlbertClient:

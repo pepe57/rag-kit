@@ -32,6 +32,8 @@ _file_processors: dict[str, ContextProvider] = {}
 _bytes_processors: dict[str, BytesContextProvider] = {}
 # Maps file extensions to provider names (built dynamically from loaded modules)
 _ext_to_provider: dict[str, str] = {}
+# MIME types accepted for file upload dialogs (built from loaded modules)
+_accepted_mime_types: dict[str, list[str]] = {}
 
 
 def _load_modules_config() -> dict[str, Any]:
@@ -44,7 +46,7 @@ def _load_modules_config() -> dict[str, Any]:
 
 def _initialize_providers() -> None:
     """Initialize providers from modules.yml configuration."""
-    global _file_processors, _bytes_processors, _ext_to_provider
+    global _file_processors, _bytes_processors, _ext_to_provider, _accepted_mime_types
 
     if _file_processors:  # Already initialized
         return
@@ -82,6 +84,12 @@ def _initialize_providers() -> None:
                     _ext_to_provider[ext] = name
             else:
                 _ext_to_provider[".pdf"] = name
+
+            # Build accepted MIME types for file picker dialogs
+            if hasattr(module, "ACCEPTED_MIME_TYPES"):
+                _accepted_mime_types.update(module.ACCEPTED_MIME_TYPES)
+            else:
+                _accepted_mime_types["application/pdf"] = [".pdf"]
 
         except ImportError:
             # Module not installed, skip silently
@@ -166,6 +174,20 @@ def is_provider_available(provider: str) -> bool:
     """
     _initialize_providers()
     return provider in _file_processors or provider in _bytes_processors
+
+
+def get_accepted_mime_types() -> dict[str, list[str]]:
+    """Get accepted MIME types for file upload dialogs.
+
+    Returns a dict mapping MIME types to file extensions, suitable for
+    Chainlit's accept config or Reflex's rx.upload accept parameter.
+
+    Returns:
+        Dict like {"application/pdf": [".pdf"], "text/markdown": [".md"]}.
+        Falls back to PDF-only if no module is loaded.
+    """
+    _initialize_providers()
+    return _accepted_mime_types or {"application/pdf": [".pdf"]}
 
 
 def list_available_providers() -> list[str]:

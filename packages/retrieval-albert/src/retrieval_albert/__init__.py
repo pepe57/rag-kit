@@ -27,6 +27,7 @@ from .ingestion import (
     list_collections,
 )
 from .parser import (
+    ACCEPTED_MIME_TYPES,
     SUPPORTED_EXTENSIONS,
     extract_text,
     extract_text_from_bytes,
@@ -43,6 +44,7 @@ __all__ = [
     # Types
     "RetrievedChunk",
     # Parser (context_loader-compatible, same interface as retrieval-basic)
+    "ACCEPTED_MIME_TYPES",
     "SUPPORTED_EXTENSIONS",
     "extract_text",
     "extract_text_from_bytes",
