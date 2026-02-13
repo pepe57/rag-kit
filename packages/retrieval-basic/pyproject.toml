@@ -5,7 +5,7 @@ description = "Basic retrieval components - PDF text extraction and context form
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pypdf>=5.0.0",
+    "rag-core",
 ]
 
 [build-system]

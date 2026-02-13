@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any, TypedDict
 
 import reflex as rx
@@ -221,19 +222,24 @@ class State(rx.State):
         )
 
         # Stream the results, yielding after every word.
-        for item in session:
-            if item.choices and hasattr(item.choices[0].delta, "content"):
-                answer_text = item.choices[0].delta.content
-                # Ensure answer_text is not None before concatenation
-                if answer_text is not None:
-                    self._chats[self.current_chat][-1]["answer"] += answer_text
-                else:
-                    # Handle the case where answer_text is None,
-                    # perhaps log it or assign a default value.
-                    answer_text = ""
-                    self._chats[self.current_chat][-1]["answer"] += answer_text
-                self._chats = self._chats
-                yield
+        try:
+            for item in session:
+                if item.choices and hasattr(item.choices[0].delta, "content"):
+                    answer_text = item.choices[0].delta.content
+                    # Ensure answer_text is not None before concatenation
+                    if answer_text is not None:
+                        self._chats[self.current_chat][-1]["answer"] += answer_text
+                    else:
+                        # Handle the case where answer_text is None,
+                        # perhaps log it or assign a default value.
+                        answer_text = ""
+                        self._chats[self.current_chat][-1]["answer"] += answer_text
+                    self._chats = self._chats
+                    yield
+        except json.JSONDecodeError:
+            # Albert API occasionally sends malformed SSE events; continue
+            # with whatever content was streamed so far.
+            pass
 
         # Toggle the processing flag.
         self.processing = False

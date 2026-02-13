@@ -2,5 +2,4 @@
 # Enable/disable context providers by commenting/uncommenting
 
 context_providers:
-  pdf: pdf_context
-  # chroma: chroma_context  # Coming soon
+  retrieval: retrieval_basic

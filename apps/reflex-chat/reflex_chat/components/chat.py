@@ -1,7 +1,16 @@
 import reflex as rx
 from reflex.constants.colors import ColorType
 
+from typing import cast
+from collections.abc import Sequence
+
+from context_loader import get_accepted_mime_types
 from reflex_chat.state import QA, State
+
+
+def _get_upload_accept() -> dict[str, Sequence[str]]:
+    """Get accepted MIME types for the file upload component."""
+    return cast(dict[str, Sequence[str]], get_accepted_mime_types())
 
 
 def message_content(text: str, color: ColorType) -> rx.Component:
@@ -101,8 +110,8 @@ def action_bar() -> rx.Component:
                     rx.hstack(
                         rx.upload(
                             rx.icon("paperclip", size=18, color=rx.color("mauve", 11)),
-                            id="upload_pdf",
-                            accept={"application/pdf": [".pdf"]},
+                            id="upload_file",
+                            accept=_get_upload_accept(),
                             multiple=False,
                             on_drop=State.handle_upload,
                             padding="4px",

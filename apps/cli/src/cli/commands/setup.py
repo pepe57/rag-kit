@@ -151,7 +151,7 @@ FRONTENDS = {
 # Available modules (packages)
 MODULES = {
     "PDF": {"template": "retrieval-basic", "available": True},
-    "Chroma": {"template": "chroma-context", "available": False},
+    "Albert RAG": {"template": "retrieval-albert", "available": True},
 }
 
 # Project structure options
@@ -275,6 +275,15 @@ def get_albert_client_source() -> Path:
         ("packages", "albert-client", "src", "albert"),
         ("albert_src",),
         "albert-client source not found. This is a packaging error - please reinstall the CLI.",
+    )
+
+
+def get_retrieval_albert_source() -> Path:
+    """Get the retrieval-albert source directory for inline copying."""
+    return _get_source_path(
+        ("packages", "retrieval-albert", "src", "retrieval_albert"),
+        ("retrieval_albert_src",),
+        "retrieval-albert source not found. This is a packaging error - please reinstall the CLI.",
     )
 
 
@@ -404,14 +413,16 @@ def generate_standalone(
 
     # Template variables
     project_name = target_path.name
+    # Determine retrieval module: "basic" for PDF, "albert" for Albert RAG
+    retrieval_module = "basic" if "PDF" in selected_modules else "albert"
+
     variables: dict[str, str | bool] = {
         "project_name": project_name,
         "description": f"{project_name} - RAG application",
         "openai_api_key": env_config["openai_api_key"],
         "openai_base_url": env_config["openai_base_url"],
         "system_prompt": preset_config["system_prompt"],
-        "use_pdf": "PDF" in selected_modules,
-        "use_chroma": "Chroma" in selected_modules,
+        "retrieval_module": retrieval_module,
         "welcome_message": f"Welcome to {project_name}!",
     }
 
@@ -431,6 +442,8 @@ def generate_standalone(
     setuptools_packages_list = ["albert", "rag_core"]
     if "PDF" in selected_modules:
         setuptools_packages_list.append("retrieval_basic")
+    if "Albert RAG" in selected_modules:
+        setuptools_packages_list.append("retrieval_albert")
     setuptools_packages = f"packages = {setuptools_packages_list}"
 
     # For standalone, albert-client, rag-core, and retrieval-basic are local modules (not dependencies)
@@ -535,11 +548,7 @@ package = true
     modules_yml_content = "# RAG Facile Module Configuration\n"
     modules_yml_content += "# Auto-generated based on selected modules\n\n"
     modules_yml_content += "context_providers:\n"
-    if "PDF" in selected_modules:
-        modules_yml_content += "  pdf: retrieval_basic\n"
-    if "Chroma" in selected_modules:
-        modules_yml_content += "  chroma: chroma_context\n"
-
+    modules_yml_content += f"  retrieval: retrieval_{retrieval_module}\n"
     (target_path / "modules.yml").write_text(modules_yml_content)
     console.print("[dim]  ✓ modules.yml[/dim]")
 
@@ -603,6 +612,30 @@ package = true
             console.print(f"[yellow]Warning: {e}[/yellow]")
             console.print(
                 "[yellow]You'll need to install retrieval-basic manually.[/yellow]"
+            )
+
+    # Copy retrieval_albert as local module if selected
+    if "Albert RAG" in selected_modules:
+        console.print()
+        console.print(
+            "[bold green]Step 5b:[/bold green] Adding Albert RAG retrieval module..."
+        )
+
+        try:
+            albert_rag_source = get_retrieval_albert_source()
+            target_albert_rag = target_path / "retrieval_albert"
+            if target_albert_rag.exists():
+                shutil.rmtree(target_albert_rag)
+            shutil.copytree(albert_rag_source, target_albert_rag)
+            # Remove __pycache__ if copied
+            pycache = target_albert_rag / "__pycache__"
+            if pycache.exists():
+                shutil.rmtree(pycache)
+            console.print("[green]✓[/green] Albert RAG retrieval module added")
+        except FileNotFoundError as e:
+            console.print(f"[yellow]Warning: {e}[/yellow]")
+            console.print(
+                "[yellow]You'll need to install retrieval-albert manually.[/yellow]"
             )
 
     # Step 6: Create ragfacile.toml config file
@@ -784,8 +817,26 @@ def run(
         console.print("[red]Aborted.[/red]")
         raise typer.Exit(1)
 
-    # Use preset's retrieval module (skip interactive selection)
-    selected_modules = [preset_config["retrieval_module"]]
+    # Select retrieval module — both handle PDF file attachments,
+    # but use different backends (local pypdf vs Albert parse API).
+    module_choice = questionary.select(
+        "Select your retrieval module:",
+        choices=[
+            questionary.Choice(
+                "Albert RAG - Server-side parsing, search & reranking (recommended)",
+                value="Albert RAG",
+            ),
+            questionary.Choice(
+                "PDF - Local text extraction (offline, simple)",
+                value="PDF",
+            ),
+        ],
+    ).ask()
+    if not module_choice:
+        console.print("[red]Aborted.[/red]")
+        raise typer.Exit(1)
+
+    selected_modules = [module_choice]
 
     # Prompt for environment configuration (use current env as defaults)
     console.print()
@@ -820,7 +871,7 @@ def run(
     console.print(f"  Preset: {preset} ({preset_config['description']})")
     console.print(f"  Frontend: {frontend_choice}")
     console.print(f"  Model: {preset_config['model_alias']}")
-    console.print(f"  Retrieval: {preset_config['retrieval_module']}")
+    console.print(f"  Retrieval: {module_choice}")
     console.print(f"  API: {env_config['openai_base_url']}")
     console.print()
 
@@ -892,8 +943,8 @@ def run(
         "reflex-chat",
         "albert-client",
         "retrieval-basic",
+        "retrieval-albert",
         "rag-core",
-        "chroma-context",
     ]:
         src = templates_dir / template_name
         dst = target_templates / template_name
@@ -944,15 +995,35 @@ def run(
     app_cmd.append(f"--openai_api_key={env_config['openai_api_key']}")
     app_cmd.append(f"--openai_base_url={env_config['openai_base_url']}")
 
-    # Add feature flags (boolean variables passed as flags)
-    if "PDF" in selected_modules:
-        app_cmd.append("--use_pdf")
-    if "Chroma" in selected_modules:
-        app_cmd.append("--use_chroma")
-
+    # Add retrieval module variable
+    retrieval_module = "basic" if "PDF" in selected_modules else "albert"
+    app_cmd.append(f"--retrieval_module={retrieval_module}")
     if not run_command(app_cmd, f"generate {frontend_template}", cwd=target_path):
         raise typer.Exit(1)
     console.print(f"[green]✓[/green] {frontend_choice} app generated")
+
+    # Post-generation: rename Reflex app package to match project_name
+    # Moon templates can't use filters in directory names, so the template
+    # generates a static "app/" directory that needs renaming.
+    if frontend_choice == "Reflex":
+        app_dir = target_path / "apps" / frontend_template
+        static_pkg = app_dir / "app"
+        if static_pkg.exists():
+            # Read project_name from rxconfig.py to get the actual app_name
+            rxconfig = app_dir / "rxconfig.py"
+            if rxconfig.exists():
+                import re
+
+                match = re.search(r'app_name="([^"]+)"', rxconfig.read_text())
+                if match:
+                    app_module_name = match.group(1)
+                    target_pkg = app_dir / app_module_name
+                    static_pkg.rename(target_pkg)
+                    # Rename app.py to {module_name}.py inside the package
+                    static_main = target_pkg / "app.py"
+                    if static_main.exists():
+                        static_main.rename(target_pkg / f"{app_module_name}.py")
+                    console.print(f"[dim]  ✓ Renamed app/ → {app_module_name}/[/dim]")
 
     # Create .env file from template values
     app_dir = target_path / "apps" / frontend_template

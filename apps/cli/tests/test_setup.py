@@ -108,12 +108,6 @@ class TestConstants:
         assert MODULES["PDF"]["template"] == "retrieval-basic"
         assert MODULES["PDF"]["available"] is True
 
-    def test_modules_has_chroma(self):
-        """Should have Chroma module option (not yet available)."""
-        assert "Chroma" in MODULES
-        assert MODULES["Chroma"]["template"] == "chroma-context"
-        assert MODULES["Chroma"]["available"] is False
-
     def test_project_structures_has_standalone(self):
         """Should have standalone project structure option."""
         assert "Simple (recommended for getting started)" in PROJECT_STRUCTURES
@@ -209,31 +203,16 @@ class TestRenderTemplateFile:
 
     def test_multiple_conditionals(self, temp_template):
         """Should handle multiple conditional blocks."""
-        content = (
-            """{%- if use_pdf %}PDF{%- endif %}{%- if use_chroma %}Chroma{%- endif %}"""
-        )
+        content = """{%- if use_pdf %}PDF{%- endif %}"""
         temp_template.write_text(content)
 
-        # Both true
-        result = render_template_file(
-            temp_template, {"use_pdf": True, "use_chroma": True}
-        )
+        # PDF enabled
+        result = render_template_file(temp_template, {"use_pdf": True})
         assert "PDF" in result
-        assert "Chroma" in result
 
-        # Only pdf
-        result = render_template_file(
-            temp_template, {"use_pdf": True, "use_chroma": False}
-        )
-        assert "PDF" in result
-        assert "Chroma" not in result
-
-        # Neither
-        result = render_template_file(
-            temp_template, {"use_pdf": False, "use_chroma": False}
-        )
+        # PDF disabled
+        result = render_template_file(temp_template, {"use_pdf": False})
         assert "PDF" not in result
-        assert "Chroma" not in result
 
     def test_combined_variables_and_conditionals(self, temp_template):
         """Should handle both variables and conditionals."""
@@ -505,10 +484,10 @@ class TestGenerateStandalone:
         assert "'albert'" in content or '"albert"' in content
         assert "'retrieval_basic'" in content or '"retrieval_basic"' in content
 
-    def test_modules_yml_includes_pdf_provider(
+    def test_modules_yml_includes_retrieval_provider(
         self, standalone_target, mock_standalone_deps, preset_config
     ):
-        """Should configure pdf provider in modules.yml when PDF selected."""
+        """Should configure retrieval provider in modules.yml based on selection."""
         from cli.commands.setup import generate_standalone
 
         generate_standalone(
@@ -527,7 +506,7 @@ class TestGenerateStandalone:
 
         modules_yml = standalone_target / "modules.yml"
         content = modules_yml.read_text()
-        assert "pdf: retrieval_basic" in content
+        assert "retrieval: retrieval_basic" in content
 
     def test_creates_chainlit_md_for_chainlit(
         self, standalone_target, mock_standalone_deps, preset_config
@@ -723,6 +702,7 @@ class TestWorkspaceCommand:
             "Monorepo (for multi-app projects)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"
@@ -760,6 +740,7 @@ class TestWorkspaceCommand:
             "Simple (recommended for getting started)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"
@@ -864,6 +845,7 @@ class TestStandaloneWorkspaceCommand:
             "Simple (recommended for getting started)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"

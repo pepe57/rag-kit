@@ -30,6 +30,10 @@ class BytesContextProvider(Protocol):
 # Provider registry - maps provider names to their processing functions
 _file_processors: dict[str, ContextProvider] = {}
 _bytes_processors: dict[str, BytesContextProvider] = {}
+# Maps file extensions to provider names (built dynamically from loaded modules)
+_ext_to_provider: dict[str, str] = {}
+# MIME types accepted for file upload dialogs (built from loaded modules)
+_accepted_mime_types: dict[str, list[str]] = {}
 
 
 def _load_modules_config() -> dict[str, Any]:
@@ -42,7 +46,7 @@ def _load_modules_config() -> dict[str, Any]:
 
 def _initialize_providers() -> None:
     """Initialize providers from modules.yml configuration."""
-    global _file_processors, _bytes_processors
+    global _file_processors, _bytes_processors, _ext_to_provider, _accepted_mime_types
 
     if _file_processors:  # Already initialized
         return
@@ -54,11 +58,11 @@ def _initialize_providers() -> None:
         try:
             module = importlib.import_module(module_name)
 
-            # Register file processor if available
-            if hasattr(module, "process_pdf_file"):
-                _file_processors[name] = module.process_pdf_file
-            elif hasattr(module, "process_file"):
+            # Register file processor — prefer generic process_file over PDF-only
+            if hasattr(module, "process_file"):
                 _file_processors[name] = module.process_file
+            elif hasattr(module, "process_pdf_file"):
+                _file_processors[name] = module.process_pdf_file
 
             # Register bytes processor if available
             if hasattr(module, "extract_text_from_bytes"):
@@ -74,6 +78,19 @@ def _initialize_providers() -> None:
 
                     _bytes_processors[name] = make_bytes_processor(module)
 
+            # Build extension map from module's SUPPORTED_EXTENSIONS or default to .pdf
+            if hasattr(module, "SUPPORTED_EXTENSIONS"):
+                for ext in module.SUPPORTED_EXTENSIONS:
+                    _ext_to_provider[ext] = name
+            else:
+                _ext_to_provider[".pdf"] = name
+
+            # Build accepted MIME types for file picker dialogs
+            if hasattr(module, "ACCEPTED_MIME_TYPES"):
+                _accepted_mime_types.update(module.ACCEPTED_MIME_TYPES)
+            else:
+                _accepted_mime_types["application/pdf"] = [".pdf"]
+
         except ImportError:
             # Module not installed, skip silently
             pass
@@ -83,7 +100,7 @@ def get_file_processor(provider: str) -> ContextProvider | None:
     """Get a file processor by provider name.
 
     Args:
-        provider: The provider name (e.g., 'pdf', 'chroma')
+        provider: The provider name (e.g., 'pdf')
 
     Returns:
         The processor function or None if not available.
@@ -119,12 +136,7 @@ def process_file(path: str | Path, filename: str | None = None) -> str:
     path = Path(path)
     ext = path.suffix.lower()
 
-    # Map extensions to providers
-    ext_to_provider = {
-        ".pdf": "pdf",
-    }
-
-    provider = ext_to_provider.get(ext)
+    provider = _ext_to_provider.get(ext)
     if provider and provider in _file_processors:
         return _file_processors[provider](str(path), filename)
 
@@ -144,12 +156,7 @@ def process_bytes(data: bytes, filename: str) -> str:
     _initialize_providers()
     ext = Path(filename).suffix.lower()
 
-    # Map extensions to providers
-    ext_to_provider = {
-        ".pdf": "pdf",
-    }
-
-    provider = ext_to_provider.get(ext)
+    provider = _ext_to_provider.get(ext)
     if provider and provider in _bytes_processors:
         return _bytes_processors[provider](data, filename)
 
@@ -167,6 +174,20 @@ def is_provider_available(provider: str) -> bool:
     """
     _initialize_providers()
     return provider in _file_processors or provider in _bytes_processors
+
+
+def get_accepted_mime_types() -> dict[str, list[str]]:
+    """Get accepted MIME types for file upload dialogs.
+
+    Returns a dict mapping MIME types to file extensions, suitable for
+    Chainlit's accept config or Reflex's rx.upload accept parameter.
+
+    Returns:
+        Dict like {"application/pdf": [".pdf"], "text/markdown": [".md"]}.
+        Falls back to PDF-only if no module is loaded.
+    """
+    _initialize_providers()
+    return _accepted_mime_types or {"application/pdf": [".pdf"]}
 
 
 def list_available_providers() -> list[str]:
