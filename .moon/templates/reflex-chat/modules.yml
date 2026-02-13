@@ -2,8 +2,4 @@
 # Auto-generated based on selected modules
 
 context_providers:
-{%- if use_pdf %}
-  pdf: retrieval_basic
-{%- else %}
-  albert_rag: retrieval_albert
-{%- endif %}
+  retrieval: retrieval_{{ retrieval_module }}

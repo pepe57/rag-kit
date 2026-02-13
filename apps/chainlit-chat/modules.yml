@@ -2,4 +2,4 @@
 # Enable/disable context providers by commenting/uncommenting
 
 context_providers:
-  pdf: retrieval_basic
+  retrieval: retrieval_basic

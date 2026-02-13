@@ -413,13 +413,16 @@ def generate_standalone(
 
     # Template variables
     project_name = target_path.name
+    # Determine retrieval module: "basic" for PDF, "albert" for Albert RAG
+    retrieval_module = "basic" if "PDF" in selected_modules else "albert"
+
     variables: dict[str, str | bool] = {
         "project_name": project_name,
         "description": f"{project_name} - RAG application",
         "openai_api_key": env_config["openai_api_key"],
         "openai_base_url": env_config["openai_base_url"],
         "system_prompt": preset_config["system_prompt"],
-        "use_pdf": "PDF" in selected_modules,
+        "retrieval_module": retrieval_module,
         "welcome_message": f"Welcome to {project_name}!",
     }
 
@@ -545,10 +548,7 @@ package = true
     modules_yml_content = "# RAG Facile Module Configuration\n"
     modules_yml_content += "# Auto-generated based on selected modules\n\n"
     modules_yml_content += "context_providers:\n"
-    if "PDF" in selected_modules:
-        modules_yml_content += "  pdf: retrieval_basic\n"
-    if "Albert RAG" in selected_modules:
-        modules_yml_content += "  albert_rag: retrieval_albert\n"
+    modules_yml_content += f"  retrieval: retrieval_{retrieval_module}\n"
     (target_path / "modules.yml").write_text(modules_yml_content)
     console.print("[dim]  ✓ modules.yml[/dim]")
 
@@ -995,9 +995,9 @@ def run(
     app_cmd.append(f"--openai_api_key={env_config['openai_api_key']}")
     app_cmd.append(f"--openai_base_url={env_config['openai_base_url']}")
 
-    # Add feature flags (boolean variables passed as flags)
-    if "PDF" in selected_modules:
-        app_cmd.append("--use_pdf")
+    # Add retrieval module variable
+    retrieval_module = "basic" if "PDF" in selected_modules else "albert"
+    app_cmd.append(f"--retrieval_module={retrieval_module}")
     if not run_command(app_cmd, f"generate {frontend_template}", cwd=target_path):
         raise typer.Exit(1)
     console.print(f"[green]✓[/green] {frontend_choice} app generated")

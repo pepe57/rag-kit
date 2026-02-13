@@ -484,10 +484,10 @@ class TestGenerateStandalone:
         assert "'albert'" in content or '"albert"' in content
         assert "'retrieval_basic'" in content or '"retrieval_basic"' in content
 
-    def test_modules_yml_includes_pdf_provider(
+    def test_modules_yml_includes_retrieval_provider(
         self, standalone_target, mock_standalone_deps, preset_config
     ):
-        """Should configure pdf provider in modules.yml when PDF selected."""
+        """Should configure retrieval provider in modules.yml based on selection."""
         from cli.commands.setup import generate_standalone
 
         generate_standalone(
@@ -506,7 +506,7 @@ class TestGenerateStandalone:
 
         modules_yml = standalone_target / "modules.yml"
         content = modules_yml.read_text()
-        assert "pdf: retrieval_basic" in content
+        assert "retrieval: retrieval_basic" in content
 
     def test_creates_chainlit_md_for_chainlit(
         self, standalone_target, mock_standalone_deps, preset_config

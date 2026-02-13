@@ -311,20 +311,14 @@ def generate_app_template(app_name: str, source_dir: Path, force: bool = False):
                 "[\"{{ project_name | replace(from='-', to='_') }}*\"]",
             )
 
-        # Make retrieval dependency conditional (retrieval-basic vs retrieval-albert)
+        # Make retrieval dependency configurable via retrieval_module variable
         content = content.replace(
             '    "retrieval-basic",',
-            '{%- if use_pdf %}\n    "retrieval-basic",\n{%- else %}\n    "retrieval-albert",\n{%- endif %}',
+            '    "retrieval-{{ retrieval_module }}",',
         )
-
-        # Update uv sources for conditional retrieval dep
         content = content.replace(
             "retrieval-basic = { workspace = true }",
-            """{%- if use_pdf %}
-retrieval-basic = { workspace = true }
-{%- else %}
-retrieval-albert = { workspace = true }
-{%- endif %}""",
+            "retrieval-{{ retrieval_module }} = { workspace = true }",
         )
 
         # Add [tool.uv] package = true if not present
@@ -339,11 +333,7 @@ retrieval-albert = { workspace = true }
 # Auto-generated based on selected modules
 
 context_providers:
-{%- if use_pdf %}
-  pdf: retrieval_basic
-{%- else %}
-  albert_rag: retrieval_albert
-{%- endif %}
+  retrieval: retrieval_{{ retrieval_module }}
 """
     (target / "modules.yml").write_text(modules_yml_content)
     console.print("  [green]✓[/green] modules.yml template generated")
@@ -429,9 +419,10 @@ context_providers:
             else "You are a friendly chatbot named Reflex. Respond in markdown.",
             "prompt": "Initial system prompt for the assistant",
         },
-        "use_pdf": {
-            "type": "boolean",
-            "default": False,
+        "retrieval_module": {
+            "type": "string",
+            "default": "basic",
+            "prompt": "Retrieval module (basic or albert)",
         },
     }
 
