@@ -702,6 +702,7 @@ class TestWorkspaceCommand:
             "Monorepo (for multi-app projects)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"
@@ -739,6 +740,7 @@ class TestWorkspaceCommand:
             "Simple (recommended for getting started)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"
@@ -843,6 +845,7 @@ class TestStandaloneWorkspaceCommand:
             "Simple (recommended for getting started)",  # First call: structure selection
             "balanced",  # Second call: preset selection
             "Chainlit",  # Third call: frontend selection
+            "PDF",  # Fourth call: retrieval module selection
         ]
         mock_q.confirm.return_value.ask.return_value = True
         mock_q.text.return_value.ask.return_value = "test-value"

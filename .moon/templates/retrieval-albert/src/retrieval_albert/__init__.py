@@ -27,9 +27,12 @@ from .ingestion import (
     list_collections,
 )
 from .parser import (
+    SUPPORTED_EXTENSIONS,
+    extract_text,
     extract_text_from_bytes,
     extract_text_from_pdf,
     format_as_context,
+    process_file,
     process_multiple_files,
     process_pdf_file,
 )
@@ -40,9 +43,12 @@ __all__ = [
     # Types
     "RetrievedChunk",
     # Parser (context_loader-compatible, same interface as retrieval-basic)
+    "SUPPORTED_EXTENSIONS",
+    "extract_text",
     "extract_text_from_bytes",
     "extract_text_from_pdf",
     "format_as_context",
+    "process_file",
     "process_multiple_files",
     "process_pdf_file",
     # Ingestion

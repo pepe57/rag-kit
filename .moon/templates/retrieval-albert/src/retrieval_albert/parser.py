@@ -4,9 +4,9 @@ Provides the same interface as retrieval-basic (process_pdf_file,
 format_as_context, extract_text_from_bytes) so the two packages
 are interchangeable in context_loader.py / modules.yml.
 
-The key difference: retrieval-basic uses local pypdf extraction,
-while this module uses Albert's server-side parse API which provides
-better quality OCR and markdown conversion.
+The key difference: retrieval-basic only handles PDFs via local pypdf,
+while this module uses Albert's server-side parse API which supports
+many document formats with high-quality OCR and markdown conversion.
 """
 
 from __future__ import annotations
@@ -24,6 +24,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# File types supported by Albert's parse API (/parse-beta).
+# context_loader reads this to know which extensions to route here.
+SUPPORTED_EXTENSIONS: list[str] = [
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".pptx",
+    ".ppt",
+    ".xlsx",
+    ".xls",
+    ".odt",
+    ".ods",
+    ".odp",
+    ".html",
+    ".htm",
+    ".md",
+    ".txt",
+    ".csv",
+    ".rtf",
+    ".epub",
+]
+
+
 def _get_client() -> AlbertClient:
     """Create an AlbertClient from environment variables."""
     from albert import AlbertClient
@@ -31,38 +54,14 @@ def _get_client() -> AlbertClient:
     return AlbertClient()
 
 
-def extract_text_from_pdf(
-    path: str | Path,
-    *,
-    client: AlbertClient | None = None,
+def _parse_and_combine(
+    client: AlbertClient,
+    file_path: Path,
     force_ocr: bool = False,
 ) -> str:
-    """Extract text from a PDF file using Albert's parse API.
+    """Parse a file via Albert API and combine page contents."""
+    parsed = client.parse(file_path=file_path, force_ocr=force_ocr)
 
-    Args:
-        path: Path to the PDF file.
-        client: Optional pre-configured Albert client.
-        force_ocr: Force OCR on all pages (default: False).
-
-    Returns:
-        Extracted text content as markdown from all pages.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        ValueError: If the file is not a PDF.
-    """
-    path = Path(path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"PDF file not found: {path}")
-
-    if path.suffix.lower() != ".pdf":
-        raise ValueError(f"Expected a PDF file, got: {path.suffix}")
-
-    client = client or _get_client()
-    parsed = client.parse(file_path=path, force_ocr=force_ocr)
-
-    # Combine all page contents
     text_parts: list[str] = []
     for page in parsed.data:
         if page.content:
@@ -71,16 +70,51 @@ def extract_text_from_pdf(
     return "\n".join(text_parts)
 
 
-def extract_text_from_bytes(
-    pdf_bytes: bytes,
+# --- Generic (multi-format) API ---
+
+
+def extract_text(
+    path: str | Path,
     *,
     client: AlbertClient | None = None,
     force_ocr: bool = False,
 ) -> str:
-    """Extract text from PDF bytes using Albert's parse API.
+    """Extract text from a document using Albert's parse API.
+
+    Supports all formats in SUPPORTED_EXTENSIONS (PDF, DOCX, PPTX, etc.).
 
     Args:
-        pdf_bytes: Raw PDF file content as bytes.
+        path: Path to the document file.
+        client: Optional pre-configured Albert client.
+        force_ocr: Force OCR on all pages (default: False).
+
+    Returns:
+        Extracted text content as markdown.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+    """
+    path = Path(path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+
+    client = client or _get_client()
+    return _parse_and_combine(client, path, force_ocr=force_ocr)
+
+
+def extract_text_from_bytes(
+    data: bytes,
+    *,
+    suffix: str = ".pdf",
+    client: AlbertClient | None = None,
+    force_ocr: bool = False,
+) -> str:
+    """Extract text from file bytes using Albert's parse API.
+
+    Args:
+        data: Raw file content as bytes.
+        suffix: File extension hint for the temp file (e.g. ".pdf", ".docx").
         client: Optional pre-configured Albert client.
         force_ocr: Force OCR on all pages.
 
@@ -90,17 +124,10 @@ def extract_text_from_bytes(
     client = client or _get_client()
 
     # Write bytes to a temp file (Albert parse API requires a file path)
-    with NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
-        tmp.write(pdf_bytes)
+    with NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+        tmp.write(data)
         tmp.flush()
-        parsed = client.parse(file_path=tmp.name, force_ocr=force_ocr)
-
-    text_parts: list[str] = []
-    for page in parsed.data:
-        if page.content:
-            text_parts.append(page.content)
-
-    return "\n".join(text_parts)
+        return _parse_and_combine(client, Path(tmp.name), force_ocr=force_ocr)
 
 
 def format_as_context(text: str, filename: str) -> str:
@@ -122,18 +149,19 @@ def format_as_context(text: str, filename: str) -> str:
     )
 
 
-def process_pdf_file(
+def process_file(
     path: str | Path,
     filename: str | None = None,
     *,
     client: AlbertClient | None = None,
 ) -> str:
-    """Extract text from a PDF and format it for context injection.
+    """Parse any supported document and format it for context injection.
 
-    Drop-in replacement for retrieval_basic.process_pdf_file().
+    This is the primary entry point for context_loader. Supports all
+    file types in SUPPORTED_EXTENSIONS.
 
     Args:
-        path: Path to the PDF file.
+        path: Path to the document file.
         filename: Optional display name for the file.
         client: Optional pre-configured Albert client.
 
@@ -143,7 +171,7 @@ def process_pdf_file(
     path = Path(path)
     display_name = filename if filename else path.name
 
-    text = extract_text_from_pdf(path, client=client)
+    text = extract_text(path, client=client)
     return format_as_context(text, display_name)
 
 
@@ -152,10 +180,10 @@ def process_multiple_files(
     *,
     client: AlbertClient | None = None,
 ) -> str:
-    """Process multiple PDF files and combine their context.
+    """Process multiple document files and combine their context.
 
     Args:
-        paths: List of paths to PDF files.
+        paths: List of paths to document files.
         client: Optional pre-configured Albert client.
 
     Returns:
@@ -166,10 +194,33 @@ def process_multiple_files(
 
     for path in paths:
         try:
-            formatted = process_pdf_file(path, client=client)
+            formatted = process_file(path, client=client)
             results.append(formatted)
         except Exception as e:
             path_obj = Path(path)
-            results.append(f"\n\nError reading PDF '{path_obj.name}': {e!s}\n")
+            results.append(f"\n\nError reading '{path_obj.name}': {e!s}\n")
 
     return "".join(results)
+
+
+# --- Backward-compatible aliases (match retrieval-basic interface) ---
+
+
+def extract_text_from_pdf(
+    path: str | Path,
+    *,
+    client: AlbertClient | None = None,
+    force_ocr: bool = False,
+) -> str:
+    """Extract text from a PDF file. Alias for extract_text()."""
+    return extract_text(path, client=client, force_ocr=force_ocr)
+
+
+def process_pdf_file(
+    path: str | Path,
+    filename: str | None = None,
+    *,
+    client: AlbertClient | None = None,
+) -> str:
+    """Process a PDF file. Alias for process_file()."""
+    return process_file(path, filename=filename, client=client)

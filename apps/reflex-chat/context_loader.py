@@ -30,6 +30,8 @@ class BytesContextProvider(Protocol):
 # Provider registry - maps provider names to their processing functions
 _file_processors: dict[str, ContextProvider] = {}
 _bytes_processors: dict[str, BytesContextProvider] = {}
+# Maps file extensions to provider names (built dynamically from loaded modules)
+_ext_to_provider: dict[str, str] = {}
 
 
 def _load_modules_config() -> dict[str, Any]:
@@ -42,7 +44,7 @@ def _load_modules_config() -> dict[str, Any]:
 
 def _initialize_providers() -> None:
     """Initialize providers from modules.yml configuration."""
-    global _file_processors, _bytes_processors
+    global _file_processors, _bytes_processors, _ext_to_provider
 
     if _file_processors:  # Already initialized
         return
@@ -54,11 +56,11 @@ def _initialize_providers() -> None:
         try:
             module = importlib.import_module(module_name)
 
-            # Register file processor if available
-            if hasattr(module, "process_pdf_file"):
-                _file_processors[name] = module.process_pdf_file
-            elif hasattr(module, "process_file"):
+            # Register file processor — prefer generic process_file over PDF-only
+            if hasattr(module, "process_file"):
                 _file_processors[name] = module.process_file
+            elif hasattr(module, "process_pdf_file"):
+                _file_processors[name] = module.process_pdf_file
 
             # Register bytes processor if available
             if hasattr(module, "extract_text_from_bytes"):
@@ -73,6 +75,13 @@ def _initialize_providers() -> None:
                         return processor
 
                     _bytes_processors[name] = make_bytes_processor(module)
+
+            # Build extension map from module's SUPPORTED_EXTENSIONS or default to .pdf
+            if hasattr(module, "SUPPORTED_EXTENSIONS"):
+                for ext in module.SUPPORTED_EXTENSIONS:
+                    _ext_to_provider[ext] = name
+            else:
+                _ext_to_provider[".pdf"] = name
 
         except ImportError:
             # Module not installed, skip silently
@@ -119,12 +128,7 @@ def process_file(path: str | Path, filename: str | None = None) -> str:
     path = Path(path)
     ext = path.suffix.lower()
 
-    # Map extensions to providers
-    ext_to_provider = {
-        ".pdf": "pdf",
-    }
-
-    provider = ext_to_provider.get(ext)
+    provider = _ext_to_provider.get(ext)
     if provider and provider in _file_processors:
         return _file_processors[provider](str(path), filename)
 
@@ -144,12 +148,7 @@ def process_bytes(data: bytes, filename: str) -> str:
     _initialize_providers()
     ext = Path(filename).suffix.lower()
 
-    # Map extensions to providers
-    ext_to_provider = {
-        ".pdf": "pdf",
-    }
-
-    provider = ext_to_provider.get(ext)
+    provider = _ext_to_provider.get(ext)
     if provider and provider in _bytes_processors:
         return _bytes_processors[provider](data, filename)
 

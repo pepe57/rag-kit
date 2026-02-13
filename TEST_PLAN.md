@@ -1,4 +1,4 @@
-# 🧪 RAG Facile Test Plan (Component-First Architecture)
+# 🧪 RAG Facile Test Plan
 
 ## 📋 Prerequisites
 *   **Operating System**: macOS, Linux (Ubuntu/Debian recommended), or Windows (PowerShell).
@@ -9,22 +9,20 @@
 
 ---
 
-## 🏗️ Scenario A: Standalone Installation
-*Focus: Testing the "Lambda Developer" path where everything is self-contained in one folder.*
-
-> **Note on Modules**: The preset system (fast, balanced, accurate, legal, hr) now determines which retrieval module is included. The balanced preset includes PDF retrieval (`retrieval_basic`). There is no separate interactive module selection step.
+## 🏗️ Scenario A: Standalone with PDF Retrieval (retrieval-basic)
+*Focus: Testing the "Lambda Developer" path with local PDF extraction.*
 
 ### Step 1: Run the Installer
 
 **macOS/Linux:**
 ```bash
-export RAG_FACILE_BRANCH="feat/refactor-monorepo-structure"
+export RAG_FACILE_BRANCH="feat/retrieval-albert"
 curl -sSL "https://raw.githubusercontent.com/etalab-ia/rag-facile/refs/heads/${RAG_FACILE_BRANCH}/install.sh" | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-$env:RAG_FACILE_BRANCH = "feat/refactor-monorepo-structure"
+$env:RAG_FACILE_BRANCH = "feat/retrieval-albert"
 irm "https://raw.githubusercontent.com/etalab-ia/rag-facile/refs/heads/$env:RAG_FACILE_BRANCH/install.ps1" | iex
 ```
 
@@ -33,50 +31,109 @@ irm "https://raw.githubusercontent.com/etalab-ia/rag-facile/refs/heads/$env:RAG_
 ### Step 2: Verify CLI Installation
 ```bash
 rag-facile --version
-# Should output: rag-facile v0.9.0
+# Should output: rag-facile v0.10.1
 ```
 
-### Step 3: Run Setup (Standalone)
+### Step 3: Run Setup (Standalone with PDF)
 ```bash
 mkdir -p ~/tmp/rf-testing && cd ~/tmp/rf-testing
-rag-facile setup my-standalone-app
+rag-facile setup my-pdf-app
 ```
 
 **Interactive Prompts** — Select:
 - **Structure**: "Simple (recommended for getting started)"
 - **Preset**: "balanced"
 - **Frontend**: "Chainlit"
+- **Retrieval module**: "PDF - Local text extraction (offline, simple)"
 - **API Key**: Provide your Albert API key (or dummy value for testing)
 - **Confirm**: "Yes"
 
-### Step 4: Verify Generated Files and Enable direnv
-Navigate to `my-standalone-app/` and check:
-- [ ] `albert/` directory exists (previously `core-albert`)
-- [ ] `rag_core/` directory exists (previously `config`)
-- [ ] `retrieval_basic/` directory exists (previously `full_context`) — **included in balanced preset**
+### Step 4: Verify Generated Files
+Navigate to `my-pdf-app/` and check:
+- [ ] `albert/` directory exists
+- [ ] `rag_core/` directory exists
+- [ ] `retrieval_basic/` directory exists
 - [ ] `pyproject.toml` contains: `packages = ["albert", "rag_core", "retrieval_basic"]`
 - [ ] `.env` file contains `OPENAI_API_KEY` and `OPENAI_BASE_URL`
 - [ ] `.envrc` file exists (direnv configuration)
-- [ ] `modules.yml` contains `pdf: retrieval_basic` — **automatically included in balanced preset**
+- [ ] `modules.yml` contains `pdf: retrieval_basic`
 
 **Enable direnv** (optional but recommended):
 ```bash
 direnv allow  # Trust the .envrc file
 ```
-This will automatically load `.env` variables when you enter the directory. If direnv is not installed, the installer added it for you.
 
 ### Step 5: Run the App
 ```bash
-cd my-standalone-app
+cd my-pdf-app
 just sync
 just run
 ```
 
 **Expected**: Chainlit opens in browser at `http://localhost:8000`
 
+### Step 6: Test PDF Upload
+- [ ] Upload a `.pdf` file — should extract text and include in chat context
+- [ ] Uploading a `.docx` or other non-PDF file — should show "Unsupported file type"
+
 ---
 
-## 🏢 Scenario B: Monorepo Installation
+## 🔬 Scenario B: Standalone with Albert RAG (retrieval-albert)
+*Focus: Testing the Albert API-powered retrieval path with multi-format support.*
+
+### Step 1: Run Setup (Standalone with Albert RAG)
+```bash
+cd ~/tmp/rf-testing
+rag-facile setup my-albert-app
+```
+
+**Interactive Prompts** — Select:
+- **Structure**: "Simple (recommended for getting started)"
+- **Preset**: "balanced"
+- **Frontend**: "Chainlit"
+- **Retrieval module**: "Albert RAG - Server-side parsing, search & reranking"
+- **API Key**: Provide your Albert API key (required for Albert RAG)
+- **Confirm**: "Yes"
+
+### Step 2: Verify Generated Files
+Navigate to `my-albert-app/` and check:
+- [ ] `albert/` directory exists
+- [ ] `rag_core/` directory exists
+- [ ] `retrieval_albert/` directory exists (NOT `retrieval_basic/`)
+- [ ] `pyproject.toml` contains: `packages = ["albert", "rag_core", "retrieval_albert"]`
+- [ ] `.env` file contains `OPENAI_API_KEY` and `OPENAI_BASE_URL`
+- [ ] `modules.yml` contains `pdf: retrieval_albert`
+
+### Step 3: Run the App
+```bash
+cd my-albert-app
+just sync
+just run
+```
+
+**Expected**: Chainlit opens in browser at `http://localhost:8000`
+
+### Step 4: Test Multi-Format File Upload
+With Albert RAG, many file types are supported via Albert's parse API:
+- [ ] Upload a `.pdf` file — should parse via Albert API and include in chat
+- [ ] Upload a `.docx` file — should parse via Albert API and include in chat
+- [ ] Upload a `.pptx` file — should parse via Albert API and include in chat
+- [ ] Upload a `.txt` or `.md` file — should parse and include in chat
+- [ ] Upload an unsupported format (e.g., `.zip`) — should show "Unsupported file type"
+
+### Step 5: Verify the Retrieval Module API
+```python
+# In a Python shell within the project
+from retrieval_albert import SUPPORTED_EXTENSIONS, process_file, extract_text
+
+# Check supported extensions
+print(SUPPORTED_EXTENSIONS)
+# Should include: .pdf, .docx, .pptx, .xlsx, .html, .md, .txt, .csv, etc.
+```
+
+---
+
+## 🏢 Scenario C: Monorepo Installation
 *Focus: Testing the "Advanced Developer" path with a Moonrepo workspace.*
 
 ### Step 1: Run Setup (Monorepo)
@@ -89,6 +146,7 @@ rag-facile setup rf-monorepo
 - **Structure**: "Monorepo (for multi-app projects)"
 - **Preset**: "accurate"
 - **Frontend**: "Reflex"
+- **Retrieval module**: "Albert RAG - Server-side parsing, search & reranking"
 - **API Key**: Provide your Albert API key (or dummy value)
 - **Confirm**: "Yes"
 
@@ -100,17 +158,16 @@ cd rf-monorepo
 Check that these directories exist:
 - [ ] `.moon/templates/rag-core/`
 - [ ] `.moon/templates/albert-client/`
-- [ ] `.moon/templates/retrieval-basic/`
+- [ ] `.moon/templates/retrieval-albert/`
 - [ ] `packages/rag-core/src/rag_core/`
 - [ ] `packages/albert-client/src/albert/`
-- [ ] `packages/retrieval-basic/src/retrieval_basic/`
+- [ ] `packages/retrieval-albert/src/retrieval_albert/`
 
 ### Step 3: Verify Imports
 Open `apps/reflex-chat/reflex_chat/state.py` and verify:
 ```python
 from rag_core import get_config
 from albert import AlbertClient
-from retrieval_basic import extract_text_from_pdf
 ```
 
 ### Step 4: Enable direnv and Run Workspace Sync
@@ -118,7 +175,6 @@ from retrieval_basic import extract_text_from_pdf
 ```bash
 direnv allow  # Trust the .envrc file
 ```
-This will automatically load `.env` variables when you enter the directory.
 
 Then sync dependencies:
 ```bash
@@ -163,13 +219,13 @@ rag-facile config preset apply balanced
 ```
 
 ### 2. Dataset Generation (Data Foundry)
-Verify the preprocessor and provider imports work with new package names. Since the balanced preset includes PDF retrieval, this tests the `retrieval_basic` module:
+Verify the preprocessor and provider imports work with new package names:
 ```bash
 # Create a directory with a test document (generate-dataset expects a directory)
 mkdir test-docs
 echo "Ceci est un document test pour Albert." > test-docs/test.txt
 
-# Run generation with Albert provider (uses retrieval_basic from balanced preset)
+# Run generation with Albert provider
 rag-facile generate-dataset ./test-docs --provider albert -o dataset.jsonl
 
 # Verify output was created
@@ -205,13 +261,13 @@ grep -r "import config\." --include="*.py" apps/ packages/ 2>/dev/null || echo "
 ### Conventional Commits
 ```bash
 git log --oneline | head -5
-# Should show: feat: component-first architecture refactoring
+# Should show: feat: add retrieval-albert package and remove Chroma placeholder
 ```
 
 ### Release-Please
 Check that the GitHub Actions workflow correctly:
 - [ ] Detects the `feat:` commit
-- [ ] Updates version for `rag-core`, `albert-client`, `retrieval-basic`
+- [ ] Updates version for `rag-core`, `albert-client`, `retrieval-basic`, `retrieval-albert`
 - [ ] Creates a release PR with changelog entries
 
 ---
@@ -219,19 +275,19 @@ Check that the GitHub Actions workflow correctly:
 ## 🐛 Troubleshooting
 
 ### Installation Error: "404:: command not found"
-**Cause**: Shell variable `$RAG_FACILE_BRANCH` was not expanded  
+**Cause**: Shell variable `$RAG_FACILE_BRANCH` was not expanded
 **Solution**: Use double quotes in curl URL (and use `${VAR}` syntax for clarity):
 ```bash
 # ❌ WRONG (single quotes prevent expansion, results in 404)
 curl -sSL 'https://raw.githubusercontent.com/etalab-ia/rag-facile/refs/heads/$RAG_FACILE_BRANCH/install.sh' | bash
 
 # ✅ CORRECT (double quotes allow expansion)
-export RAG_FACILE_BRANCH="feat/refactor-monorepo-structure"
+export RAG_FACILE_BRANCH="feat/retrieval-albert"
 curl -sSL "https://raw.githubusercontent.com/etalab-ia/rag-facile/refs/heads/${RAG_FACILE_BRANCH}/install.sh" | bash
 ```
 
 ### Import Error: "ModuleNotFoundError: No module named 'config'"
-**Cause**: Templates are out of sync with source apps (still reference old package name)  
+**Cause**: Templates are out of sync with source apps (still reference old package name)
 **Solution**: This is typically prevented by the automatic pre-commit hook that regenerates templates. However, if you encounter this:
 
 ```bash
@@ -245,8 +301,8 @@ uv run pre-commit install
 
 **Note**: The pre-commit hook automatically regenerates templates whenever:
 - `apps/chainlit-chat/` files change
-- `apps/reflex-chat/` files change  
-- `packages/(albert-client|rag-core|retrieval-basic)/` files change
+- `apps/reflex-chat/` files change
+- `packages/(albert-client|rag-core|retrieval-albert|retrieval-basic)/` files change
 
 **If manually editing**: Update imports to `rag_core`:
 ```python
@@ -258,14 +314,14 @@ from rag_core import get_config
 ```
 
 ### Setup Command Fails
-**Cause**: Branch not pushed to origin  
+**Cause**: Branch not pushed to origin
 **Solution**: Ensure branch is available on GitHub:
 ```bash
-git push -u origin feat/refactor-monorepo-structure
+git push -u origin feat/retrieval-albert
 ```
 
 ### rag-facile Command Not Found
-**Cause**: `~/.local/bin` not in PATH  
+**Cause**: `~/.local/bin` not in PATH
 **Solution**: Add to shell profile:
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -278,27 +334,36 @@ export PATH="$HOME/.local/bin:$PATH"
 Keep track of your testing:
 
 ```markdown
-### Standalone Test (Chainlit)
+### Standalone Test — PDF Retrieval (Chainlit)
 - [ ] Installation successful
 - [ ] rag-facile --version works
+- [ ] Setup shows retrieval module choice (PDF vs Albert RAG)
 - [ ] Setup creates correct directory structure
-- [ ] New package names present (albert, rag_core, retrieval_basic)
-- [ ] retrieval_basic included automatically (part of balanced preset)
+- [ ] retrieval_basic/ included when PDF selected
 - [ ] App runs: `just run` starts Chainlit server
+- [ ] PDF upload works
+- [ ] Non-PDF files correctly rejected
 - [ ] Config commands work
-- [ ] No import errors
 - [ ] modules.yml contains `pdf: retrieval_basic`
+
+### Standalone Test — Albert RAG (Chainlit)
+- [ ] Setup creates correct directory structure
+- [ ] retrieval_albert/ included when Albert RAG selected
+- [ ] App runs: `just run` starts Chainlit server
+- [ ] PDF upload works (via Albert parse API)
+- [ ] DOCX upload works (multi-format support)
+- [ ] PPTX upload works
+- [ ] modules.yml contains `pdf: retrieval_albert`
 
 ### Monorepo Test (Reflex)
 - [ ] Installation successful
 - [ ] Setup creates monorepo structure
-- [ ] Templates exist for all packages (including retrieval-basic from preset)
+- [ ] Templates exist for all packages (including retrieval-albert)
 - [ ] just sync completes without errors
 - [ ] just type-check passes
 - [ ] just run reflex-chat starts dev server
 - [ ] No import errors in state.py
-- [ ] Dataset generation works with retrieval_basic
-- [ ] modules.yml contains `pdf: retrieval_basic`
+- [ ] Dataset generation works
 
 ### Quality Checks
 - [ ] No legacy imports found
