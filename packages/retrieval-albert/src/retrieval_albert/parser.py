@@ -77,7 +77,8 @@ def extract_text(
 ) -> str:
     """Extract text from a document using Albert's parse API.
 
-    Supports all formats in SUPPORTED_EXTENSIONS (PDF, DOCX, PPTX, etc.).
+    For PDF files, falls back to local pypdf extraction if the Albert
+    API returns a server error (e.g. 500).
 
     Args:
         path: Path to the document file.
@@ -90,13 +91,28 @@ def extract_text(
     Raises:
         FileNotFoundError: If the file doesn't exist.
     """
+    import httpx
+
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
 
     client = client or _get_client()
-    return _parse_and_combine(client, path, force_ocr=force_ocr)
+
+    try:
+        return _parse_and_combine(client, path, force_ocr=force_ocr)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code >= 500 and path.suffix.lower() == ".pdf":
+            logger.warning(
+                "Albert parse API returned %s for '%s', falling back to local pypdf",
+                e.response.status_code,
+                path.name,
+            )
+            from rag_core.pdf import extract_text_from_pdf
+
+            return extract_text_from_pdf(path)
+        raise
 
 
 def extract_text_from_bytes(
@@ -108,6 +124,9 @@ def extract_text_from_bytes(
 ) -> str:
     """Extract text from file bytes using Albert's parse API.
 
+    For PDF bytes, falls back to local pypdf extraction if the Albert
+    API returns a server error (e.g. 500).
+
     Args:
         data: Raw file content as bytes.
         suffix: File extension hint for the temp file (e.g. ".pdf", ".docx").
@@ -117,13 +136,26 @@ def extract_text_from_bytes(
     Returns:
         Extracted text content as markdown.
     """
+    import httpx
+
     client = client or _get_client()
 
     # Write bytes to a temp file (Albert parse API requires a file path)
     with NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
         tmp.write(data)
         tmp.flush()
-        return _parse_and_combine(client, Path(tmp.name), force_ocr=force_ocr)
+        try:
+            return _parse_and_combine(client, Path(tmp.name), force_ocr=force_ocr)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code >= 500 and suffix.lower() == ".pdf":
+                logger.warning(
+                    "Albert parse API returned %s, falling back to local pypdf",
+                    e.response.status_code,
+                )
+                from rag_core.pdf import extract_text_from_bytes as _local_extract
+
+                return _local_extract(data)
+            raise
 
 
 def format_as_context(text: str, filename: str) -> str:
