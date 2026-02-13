@@ -9,6 +9,26 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
+
+
+def _extract_text(reader: PdfReader) -> str:
+    """Extract text from all pages of a PdfReader.
+
+    Args:
+        reader: An initialised PdfReader instance.
+
+    Returns:
+        Extracted text content from all pages, separated by newlines.
+    """
+    text_parts: list[str] = []
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text_parts.append(page_text)
+    return "\n".join(text_parts)
+
 
 def extract_text_from_pdf(path: str | Path) -> str:
     """Extract all text content from a PDF file.
@@ -24,9 +44,6 @@ def extract_text_from_pdf(path: str | Path) -> str:
         ValueError: If the file is not a PDF.
         pypdf.errors.PdfReadError: If the PDF is corrupted or password-protected.
     """
-    from pypdf import PdfReader
-    from pypdf.errors import PdfReadError
-
     path = Path(path)
 
     if not path.exists():
@@ -36,15 +53,7 @@ def extract_text_from_pdf(path: str | Path) -> str:
         raise ValueError(f"Expected a PDF file, got: {path.suffix}")
 
     try:
-        reader = PdfReader(path)
-        text_parts: list[str] = []
-
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text_parts.append(page_text)
-
-        return "\n".join(text_parts)
+        return _extract_text(PdfReader(path))
     except PdfReadError as e:
         raise PdfReadError(f"Failed to read PDF '{path}': {e}") from e
 
@@ -61,18 +70,7 @@ def extract_text_from_bytes(data: bytes) -> str:
     Raises:
         pypdf.errors.PdfReadError: If the PDF is corrupted or password-protected.
     """
-    from pypdf import PdfReader
-    from pypdf.errors import PdfReadError
-
     try:
-        reader = PdfReader(BytesIO(data))
-        text_parts: list[str] = []
-
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text_parts.append(page_text)
-
-        return "\n".join(text_parts)
+        return _extract_text(PdfReader(BytesIO(data)))
     except PdfReadError as e:
         raise PdfReadError(f"Failed to read PDF from bytes: {e}") from e

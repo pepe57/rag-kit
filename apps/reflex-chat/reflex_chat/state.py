@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Any, TypedDict
 
 import reflex as rx
@@ -235,7 +236,7 @@ class State(rx.State):
                         self._chats[self.current_chat][-1]["answer"] += answer_text
                     self._chats = self._chats
                     yield
-        except Exception:
+        except json.JSONDecodeError:
             # Albert API occasionally sends malformed SSE events; continue
             # with whatever content was streamed so far.
             pass

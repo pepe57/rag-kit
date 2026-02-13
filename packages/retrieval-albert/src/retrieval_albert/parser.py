@@ -140,10 +140,15 @@ def extract_text_from_bytes(
 
     client = client or _get_client()
 
-    # Write bytes to a temp file (Albert parse API requires a file path)
-    with NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
+    # Write bytes to a temp file (Albert parse API requires a file path).
+    # Use delete=False for Windows compatibility: NamedTemporaryFile with
+    # delete=True keeps the file open, preventing other processes from
+    # reading it on Windows.
+    tmp = NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
         tmp.write(data)
         tmp.flush()
+        tmp.close()
         try:
             return _parse_and_combine(client, Path(tmp.name), force_ocr=force_ocr)
         except httpx.HTTPStatusError as e:
@@ -156,6 +161,8 @@ def extract_text_from_bytes(
 
                 return _local_extract(data)
             raise
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
 
 
 def format_as_context(text: str, filename: str) -> str:
