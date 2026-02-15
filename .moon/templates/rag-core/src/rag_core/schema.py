@@ -104,6 +104,10 @@ class ParsingConfig(BaseModel):
 class IngestionConfig(BaseModel):
     """Configuration for document ingestion and pre-processing."""
 
+    provider: Literal["local", "albert"] = Field(
+        default="local",
+        description="Document parsing provider (local pypdf or Albert API)",
+    )
     file_types: list[str] = Field(
         default=[".pdf", ".md", ".txt"],
         description="Supported file extensions",
