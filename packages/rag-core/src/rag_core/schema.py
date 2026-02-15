@@ -157,8 +157,8 @@ class EmbeddingConfig(BaseModel):
     """Configuration for embedding generation."""
 
     model: str = Field(
-        default="albert-embedding-small",
-        description="Embedding model (albert-embedding-small, albert-embedding-large)",
+        default="openweight-embeddings",
+        description="Embedding model alias",
     )
     batch_size: int = Field(
         default=32,
@@ -270,8 +270,8 @@ class RerankingConfig(BaseModel):
         description="Enable reranking (improves precision at cost of latency)",
     )
     model: str = Field(
-        default="bge-reranker-large",
-        description="Reranking model (bge-reranker-large, bge-reranker-base)",
+        default="openweight-rerank",
+        description="Reranking model alias",
     )
     top_n: int = Field(
         default=3,

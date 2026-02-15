@@ -44,7 +44,7 @@ preserve_metadata = true
 # EMBEDDING GENERATION
 # ==============================================================================
 [embedding]
-model = "albert-embedding-small"
+model = "openweight-embeddings"
 batch_size = 32
 normalization = "L2"
 
@@ -80,7 +80,7 @@ alpha = 0.5  # Balanced semantic/lexical
 # ==============================================================================
 [reranking]
 enabled = true
-model = "bge-reranker-large"
+model = "openweight-rerank"
 top_n = 3
 
 # ==============================================================================

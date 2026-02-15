@@ -23,8 +23,8 @@ def test_default_config_is_valid():
 def test_embedding_config_validation():
     """Test embedding configuration validation."""
     # Valid config
-    config = EmbeddingConfig(model="albert-embedding-large", batch_size=16)
-    assert config.model == "albert-embedding-large"
+    config = EmbeddingConfig(model="openweight-embeddings", batch_size=16)
+    assert config.model == "openweight-embeddings"
     assert config.batch_size == 16
 
     # Invalid batch_size (too large)

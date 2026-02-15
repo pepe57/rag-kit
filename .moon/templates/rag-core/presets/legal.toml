@@ -32,7 +32,7 @@ chunk_overlap = 100  # Ensure continuity of legal reasoning
 preserve_metadata = true  # Track document/section/article numbers
 
 [embedding]
-model = "albert-embedding-large"  # Best for nuanced legal language
+model = "openweight-embeddings"
 batch_size = 16
 normalization = "L2"
 
@@ -56,7 +56,7 @@ alpha = 0.3  # Weight lexical more (legal terminology is precise)
 
 [reranking]
 enabled = true  # Critical for legal accuracy
-model = "bge-reranker-large"
+model = "openweight-rerank"
 top_n = 5
 
 [context]

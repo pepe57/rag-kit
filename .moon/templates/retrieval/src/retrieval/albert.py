@@ -83,7 +83,7 @@ def rerank_chunks(
     query: str,
     chunks: list[RetrievedChunk],
     *,
-    model: str = "bge-reranker-large",
+    model: str = "openweight-rerank",
     top_n: int | None = None,
 ) -> list[RetrievedChunk]:
     """Rerank chunks by relevance to a query.
