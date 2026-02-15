@@ -12,6 +12,7 @@ target_samples = 75
 output_format = "jsonl"
 
 [ingestion]
+provider = "albert"
 file_types = [".pdf", ".md", ".txt"]
 
 [ingestion.ocr]

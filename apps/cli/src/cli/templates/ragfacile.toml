@@ -8,6 +8,7 @@ target_samples = 50
 output_format = "jsonl"
 
 [ingestion]
+provider = "local"
 file_types = [
     ".pdf",
     ".md",

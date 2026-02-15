@@ -12,6 +12,7 @@ target_samples = 25  # Fewer samples for faster generation
 output_format = "jsonl"
 
 [ingestion]
+provider = "local"
 file_types = [".pdf", ".md", ".txt"]
 
 [ingestion.ocr]
