@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from collections.abc import Callable
 from typing import Annotated, Literal, TypedDict
 
 import questionary
@@ -261,11 +262,29 @@ def _get_source_path(
 
 
 def get_retrieval_source() -> Path:
-    """Get the unified retrieval source directory for inline copying."""
+    """Get the retrieval source directory for inline copying."""
     return _get_source_path(
         ("packages", "retrieval", "src", "retrieval"),
         ("retrieval_src",),
         "retrieval source not found. This is a packaging error - please reinstall the CLI.",
+    )
+
+
+def get_orchestration_source() -> Path:
+    """Get the orchestration source directory for inline copying."""
+    return _get_source_path(
+        ("packages", "orchestration", "src", "orchestration"),
+        ("orchestration_src",),
+        "orchestration source not found. This is a packaging error - please reinstall the CLI.",
+    )
+
+
+def get_ingestion_source() -> Path:
+    """Get the ingestion source directory for inline copying."""
+    return _get_source_path(
+        ("packages", "ingestion", "src", "ingestion"),
+        ("ingestion_src",),
+        "ingestion source not found. This is a packaging error - please reinstall the CLI.",
     )
 
 
@@ -294,6 +313,46 @@ def get_default_config_template() -> Path:
         ("templates", "ragfacile.toml"),
         "ragfacile.toml template not found. This is a packaging error - please reinstall the CLI.",
     )
+
+
+def _copy_module_to_standalone(
+    target_path: Path,
+    module_name: str,
+    get_source_func: Callable[[], Path],
+    display_name: str,
+    step: int,
+) -> None:
+    """Copy a package module into a standalone project directory.
+
+    Handles directory cleanup, __pycache__ removal, and user-facing
+    progress output.  Used by :func:`generate_standalone` to inline
+    pipeline packages (albert, rag_core, ingestion, retrieval, orchestration).
+
+    Args:
+        target_path: Root of the standalone project.
+        module_name: Directory name for the copied module (e.g. ``"rag_core"``).
+        get_source_func: Callable that returns the source :class:`Path`.
+        display_name: Human-readable name for console output.
+        step: Step number shown in the progress output.
+    """
+    console.print()
+    console.print(f"[bold green]Step {step}:[/bold green] Adding {display_name}...")
+
+    try:
+        source = get_source_func()
+        target_dir = target_path / module_name
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(source, target_dir)
+        pycache = target_dir / "__pycache__"
+        if pycache.exists():
+            shutil.rmtree(pycache)
+        console.print(f"[green]✓[/green] {display_name} added")
+    except FileNotFoundError as e:
+        console.print(f"[yellow]Warning: {e}[/yellow]")
+        console.print(
+            f"[yellow]You'll need to install {module_name} manually.[/yellow]"
+        )
 
 
 def render_template_file(template_path: Path, variables: dict[str, str | bool]) -> str:
@@ -438,16 +497,22 @@ def generate_standalone(
     console.print("[bold green]Step 2:[/bold green] Generating project files...")
 
     # Create pyproject.toml for standalone mode
-    # pypdf required for both PDF and Albert RAG (albert has local fallback in parser.py)
+    # pypdf required for both PDF and Albert RAG (albert has local fallback)
     pdf_dep = (
         '\n    "pypdf>=5.0.0",'
         if ("PDF" in selected_modules or "Albert RAG" in selected_modules)
         else ""
     )
-    setuptools_packages_list = ["albert", "rag_core", "retrieval"]
+    setuptools_packages_list = [
+        "albert",
+        "ingestion",
+        "orchestration",
+        "rag_core",
+        "retrieval",
+    ]
     setuptools_packages = f"packages = {setuptools_packages_list}"
 
-    # For standalone, albert-client, rag-core, and retrieval are local modules (not dependencies)
+    # For standalone, all pipeline packages are local modules (not dependencies)
     pyproject_content = f'''[project]
 name = "{project_name}"
 version = "0.1.0"
@@ -460,12 +525,11 @@ dependencies = [
     "openai>=1.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "pyyaml>=6.0.0",
     "tomli-w>=1.0.0",{pdf_dep}
 ]
 
 [tool.setuptools]
-py-modules = ["app", "context_loader"]
+py-modules = ["app"]
 {setuptools_packages}
 
 [tool.uv]
@@ -485,12 +549,10 @@ dependencies = [
     "openai>=1.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "pyyaml>=6.0.0",
     "tomli-w>=1.0.0",{pdf_dep}
 ]
 
 [tool.setuptools]
-py-modules = ["app", "context_loader"]
 {setuptools_packages}
 
 [tool.uv]
@@ -502,7 +564,6 @@ package = true
 
     # Copy and render app files from template
     files_to_copy = [
-        "context_loader.py",
         ".env.template",
         ".envrc",
         "README.md",
@@ -545,75 +606,25 @@ package = true
                     target_file.write_text(content)
                     console.print(f"[dim]  ✓ {snake_name}/{rel_path_str}[/dim]")
 
-    # Generate modules.yml with proper content
-    modules_yml_content = "# RAG Facile Module Configuration\n"
-    modules_yml_content += "# Auto-generated based on selected modules\n\n"
-    modules_yml_content += "context_providers:\n"
-    modules_yml_content += "  retrieval: retrieval\n"
-    (target_path / "modules.yml").write_text(modules_yml_content)
-    console.print("[dim]  ✓ modules.yml[/dim]")
-
     console.print("[green]✓[/green] Project files generated")
 
-    # Step 3: Copy albert as local module (always required)
-    console.print()
-    console.print("[bold green]Step 3:[/bold green] Adding Albert client module...")
+    # Steps 3-7: Copy pipeline modules as local packages
+    modules_to_copy = [
+        ("albert", get_albert_client_source, "Albert client module"),
+        ("rag_core", get_rag_core_source, "RAG core module"),
+        ("ingestion", get_ingestion_source, "ingestion module"),
+        ("retrieval", get_retrieval_source, "retrieval module"),
+        ("orchestration", get_orchestration_source, "orchestration module"),
+    ]
+    for i, (module_name, source_func, display_name) in enumerate(
+        modules_to_copy, start=3
+    ):
+        _copy_module_to_standalone(
+            target_path, module_name, source_func, display_name, step=i
+        )
 
-    try:
-        albert_source = get_albert_client_source()
-        target_albert = target_path / "albert"
-        if target_albert.exists():
-            shutil.rmtree(target_albert)
-        shutil.copytree(albert_source, target_albert)
-        # Remove __pycache__ if copied
-        pycache = target_albert / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Albert client module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install albert manually.[/yellow]")
-
-    # Step 4: Copy rag_core as local module (always required for config commands)
-    console.print()
-    console.print("[bold green]Step 4:[/bold green] Adding RAG core module...")
-
-    try:
-        rag_config_source = get_rag_core_source()
-        target_rag_config = target_path / "rag_core"
-        if target_rag_config.exists():
-            shutil.rmtree(target_rag_config)
-        shutil.copytree(rag_config_source, target_rag_config)
-        # Remove __pycache__ if copied
-        pycache = target_rag_config / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] RAG core module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install rag_core manually.[/yellow]")
-
-    # Step 5: Copy unified retrieval module (always required)
-    console.print()
-    console.print("[bold green]Step 5:[/bold green] Adding retrieval module...")
-
-    try:
-        retrieval_source = get_retrieval_source()
-        target_retrieval = target_path / "retrieval"
-        if target_retrieval.exists():
-            shutil.rmtree(target_retrieval)
-        shutil.copytree(retrieval_source, target_retrieval)
-        # Remove __pycache__ if copied
-        pycache = target_retrieval / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Retrieval module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install retrieval manually.[/yellow]")
-
-    # Step 6: Create ragfacile.toml config file
-    step_num = 6 if "PDF" in selected_modules else 5
+    # Step 8: Create ragfacile.toml config file
+    step_num = 8 if "PDF" in selected_modules else 7
     console.print()
     console.print(
         f"[bold green]Step {step_num}:[/bold green] Creating configuration file..."
@@ -630,8 +641,8 @@ package = true
             "[yellow]You can create config later with: rag-facile config preset apply balanced[/yellow]"
         )
 
-    # Step 7: Create .env file
-    step_num = 7 if "PDF" in selected_modules else 6
+    # Step 9: Create .env file
+    step_num = 9 if "PDF" in selected_modules else 8
     console.print()
     console.print(
         f"[bold green]Step {step_num}:[/bold green] Creating environment file..."
@@ -916,8 +927,10 @@ def run(
         "chainlit-chat",
         "reflex-chat",
         "albert-client",
-        "retrieval",
+        "ingestion",
+        "orchestration",
         "rag-core",
+        "retrieval",
     ]:
         src = templates_dir / template_name
         dst = target_templates / template_name
@@ -1049,10 +1062,32 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
             "[yellow]You can create config later with: rag-facile config preset apply balanced[/yellow]"
         )
 
-    # 6. Generate selected packages
+    # 6. Generate ingestion package (always required for document parsing)
+    console.print()
+    console.print("[bold green]Step 6:[/bold green] Generating ingestion package...")
+    ingestion_cmd = ["moon", "generate", "ingestion", "--defaults"]
+    if force:
+        ingestion_cmd.append("--force")
+    if not run_command(ingestion_cmd, "generate ingestion", cwd=target_path):
+        raise typer.Exit(1)
+    console.print("[green]✓[/green] ingestion package generated")
+
+    # 7. Generate orchestration package (always required for pipeline coordination)
+    console.print()
+    console.print(
+        "[bold green]Step 7:[/bold green] Generating orchestration package..."
+    )
+    orchestration_cmd = ["moon", "generate", "orchestration", "--defaults"]
+    if force:
+        orchestration_cmd.append("--force")
+    if not run_command(orchestration_cmd, "generate orchestration", cwd=target_path):
+        raise typer.Exit(1)
+    console.print("[green]✓[/green] orchestration package generated")
+
+    # 8. Generate selected packages
     if selected_modules:
         console.print()
-        console.print("[bold green]Step 6:[/bold green] Generating packages...")
+        console.print("[bold green]Step 8:[/bold green] Generating packages...")
 
         # Collect unique templates (both PDF and Albert RAG use same retrieval template)
         templates_to_generate = set()
@@ -1077,14 +1112,14 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
 
     # Run uv sync to install dependencies
     console.print()
-    console.print("[bold green]Step 7:[/bold green] Installing dependencies...")
+    console.print("[bold green]Step 9:[/bold green] Installing dependencies...")
     if not run_command(["uv", "sync"], "install dependencies", cwd=target_path):
         console.print("[yellow]Warning: uv sync failed. Run it manually.[/yellow]")
 
     # Start the dev server
     console.print()
     console.print(
-        f"[bold green]Step 7:[/bold green] Starting {frontend_choice} dev server..."
+        f"[bold green]Step 10:[/bold green] Starting {frontend_choice} dev server..."
     )
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
