@@ -44,7 +44,7 @@ def mock_config(monkeypatch):
     config = RAGConfig(
         chunking=ChunkingConfig(chunk_size=512, chunk_overlap=50),
         retrieval=RetrievalConfig(method="hybrid", top_k=10, score_threshold=0.0),
-        reranking=RerankingConfig(enabled=True, model="bge-reranker-large", top_n=3),
+        reranking=RerankingConfig(enabled=True, model="openweight-rerank", top_n=3),
         context=ContextConfig(
             formatting=ContextFormattingConfig(
                 include_citations=True, citation_style="inline"
@@ -125,7 +125,7 @@ def mock_rerank_response():
             {"relevance_score": 0.85, "index": 2},
             {"relevance_score": 0.70, "index": 1},
         ],
-        "model": "bge-reranker-large",
+        "model": "openweight-rerank",
         "usage": {
             "prompt_tokens": 50,
             "completion_tokens": 0,

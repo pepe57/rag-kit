@@ -129,7 +129,7 @@ class TestRerankChunks:
             ),
         ]
 
-        result = rerank_chunks(client, "query", chunks, model="bge-reranker-large")
+        result = rerank_chunks(client, "query", chunks, model="openweight-rerank")
 
         # Mock returns indices [0, 2, 1] with scores [0.98, 0.85, 0.70]
         assert len(result) == 3
@@ -211,7 +211,7 @@ class TestRetrieve:
                     "id": "r1",
                     "data": [],
                     "results": [{"relevance_score": 0.9, "index": 0}],
-                    "model": "bge-reranker-large",
+                    "model": "openweight-rerank",
                 },
             )
         )

@@ -32,7 +32,7 @@ chunk_overlap = 100  # More overlap for continuity
 preserve_metadata = true
 
 [embedding]
-model = "albert-embedding-large"  # Best embedding model
+model = "openweight-embeddings"
 batch_size = 16  # Smaller batches for stability
 normalization = "L2"
 
@@ -56,7 +56,7 @@ alpha = 0.5  # Balanced semantic/lexical
 
 [reranking]
 enabled = true  # Essential for accuracy
-model = "bge-reranker-large"
+model = "openweight-rerank"
 top_n = 5  # More final results
 
 [context]
