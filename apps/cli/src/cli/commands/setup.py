@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from collections.abc import Callable
 from typing import Annotated, Literal, TypedDict
 
 import questionary
@@ -314,6 +315,46 @@ def get_default_config_template() -> Path:
     )
 
 
+def _copy_module_to_standalone(
+    target_path: Path,
+    module_name: str,
+    get_source_func: Callable[[], Path],
+    display_name: str,
+    step: int,
+) -> None:
+    """Copy a package module into a standalone project directory.
+
+    Handles directory cleanup, __pycache__ removal, and user-facing
+    progress output.  Used by :func:`generate_standalone` to inline
+    pipeline packages (albert, rag_core, ingestion, retrieval, orchestration).
+
+    Args:
+        target_path: Root of the standalone project.
+        module_name: Directory name for the copied module (e.g. ``"rag_core"``).
+        get_source_func: Callable that returns the source :class:`Path`.
+        display_name: Human-readable name for console output.
+        step: Step number shown in the progress output.
+    """
+    console.print()
+    console.print(f"[bold green]Step {step}:[/bold green] Adding {display_name}...")
+
+    try:
+        source = get_source_func()
+        target_dir = target_path / module_name
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(source, target_dir)
+        pycache = target_dir / "__pycache__"
+        if pycache.exists():
+            shutil.rmtree(pycache)
+        console.print(f"[green]✓[/green] {display_name} added")
+    except FileNotFoundError as e:
+        console.print(f"[yellow]Warning: {e}[/yellow]")
+        console.print(
+            f"[yellow]You'll need to install {module_name} manually.[/yellow]"
+        )
+
+
 def render_template_file(template_path: Path, variables: dict[str, str | bool]) -> str:
     """Render a template file with Tera-style variables.
 
@@ -567,97 +608,20 @@ package = true
 
     console.print("[green]✓[/green] Project files generated")
 
-    # Step 3: Copy albert as local module (always required)
-    console.print()
-    console.print("[bold green]Step 3:[/bold green] Adding Albert client module...")
-
-    try:
-        albert_source = get_albert_client_source()
-        target_albert = target_path / "albert"
-        if target_albert.exists():
-            shutil.rmtree(target_albert)
-        shutil.copytree(albert_source, target_albert)
-        # Remove __pycache__ if copied
-        pycache = target_albert / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Albert client module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install albert manually.[/yellow]")
-
-    # Step 4: Copy rag_core as local module (always required for config commands)
-    console.print()
-    console.print("[bold green]Step 4:[/bold green] Adding RAG core module...")
-
-    try:
-        rag_config_source = get_rag_core_source()
-        target_rag_config = target_path / "rag_core"
-        if target_rag_config.exists():
-            shutil.rmtree(target_rag_config)
-        shutil.copytree(rag_config_source, target_rag_config)
-        # Remove __pycache__ if copied
-        pycache = target_rag_config / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] RAG core module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install rag_core manually.[/yellow]")
-
-    # Step 5: Copy ingestion module (document parsing)
-    console.print()
-    console.print("[bold green]Step 5:[/bold green] Adding ingestion module...")
-
-    try:
-        ingestion_source = get_ingestion_source()
-        target_ingestion = target_path / "ingestion"
-        if target_ingestion.exists():
-            shutil.rmtree(target_ingestion)
-        shutil.copytree(ingestion_source, target_ingestion)
-        pycache = target_ingestion / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Ingestion module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install ingestion manually.[/yellow]")
-
-    # Step 6: Copy retrieval module (search & reranking)
-    console.print()
-    console.print("[bold green]Step 6:[/bold green] Adding retrieval module...")
-
-    try:
-        retrieval_source = get_retrieval_source()
-        target_retrieval = target_path / "retrieval"
-        if target_retrieval.exists():
-            shutil.rmtree(target_retrieval)
-        shutil.copytree(retrieval_source, target_retrieval)
-        pycache = target_retrieval / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Retrieval module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install retrieval manually.[/yellow]")
-
-    # Step 7: Copy orchestration module (pipeline coordination)
-    console.print()
-    console.print("[bold green]Step 7:[/bold green] Adding orchestration module...")
-
-    try:
-        orchestration_source = get_orchestration_source()
-        target_orchestration = target_path / "orchestration"
-        if target_orchestration.exists():
-            shutil.rmtree(target_orchestration)
-        shutil.copytree(orchestration_source, target_orchestration)
-        pycache = target_orchestration / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print("[green]✓[/green] Orchestration module added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print("[yellow]You'll need to install orchestration manually.[/yellow]")
+    # Steps 3-7: Copy pipeline modules as local packages
+    modules_to_copy = [
+        ("albert", get_albert_client_source, "Albert client module"),
+        ("rag_core", get_rag_core_source, "RAG core module"),
+        ("ingestion", get_ingestion_source, "ingestion module"),
+        ("retrieval", get_retrieval_source, "retrieval module"),
+        ("orchestration", get_orchestration_source, "orchestration module"),
+    ]
+    for i, (module_name, source_func, display_name) in enumerate(
+        modules_to_copy, start=3
+    ):
+        _copy_module_to_standalone(
+            target_path, module_name, source_func, display_name, step=i
+        )
 
     # Step 8: Create ragfacile.toml config file
     step_num = 8 if "PDF" in selected_modules else 7
