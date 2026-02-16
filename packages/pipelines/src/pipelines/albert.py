@@ -64,7 +64,7 @@ class AlbertPipeline(RAGPipeline):
             The collection ID for this session.
         """
         if self._collection_id is None:
-            name = f"rag-facile-session-{int(time.time())}"
+            name = f"rag-facile-session-{time.time_ns()}"
             self._collection_id = self._storage.create_collection(
                 self.client, name, description="Auto-managed session collection"
             )
@@ -117,7 +117,7 @@ class AlbertPipeline(RAGPipeline):
         Returns:
             Confirmation message with the uploaded filename.
         """
-        suffix = Path(filename).suffix or ".pdf"
+        suffix = Path(filename).suffix or ".txt"
         collection_id = self._ensure_collection()
 
         # Albert upload API requires a file path — write to temp file.

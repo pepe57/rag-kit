@@ -122,18 +122,16 @@ async def main(message: cl.Message):
 
     # Retrieve relevant context for the user's query
     retrieved_context = process_query(message.content)
+
+    user_content = message.content
     if retrieved_context:
-        message_history.append(
-            {
-                "role": "system",
-                "content": (
-                    "Use the following context to answer the user's question:\n\n"
-                    f"{retrieved_context}"
-                ),
-            }
+        user_content = (
+            "Use the following context to answer the user's question:\n\n"
+            f"{retrieved_context}\n\n"
+            f"Question: {message.content}"
         )
 
-    message_history.append({"role": "user", "content": message.content})
+    message_history.append({"role": "user", "content": user_content})
 
     msg = cl.Message(content="")
 

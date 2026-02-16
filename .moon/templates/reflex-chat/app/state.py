@@ -182,25 +182,23 @@ class State(rx.State):
             }
         ]
 
-        # Retrieve relevant context via RAG pipeline (search -> rerank -> format)
-        retrieved_context = process_query(question)
-        if retrieved_context:
-            messages.append(
-                {
-                    "role": "system",
-                    "content": (
-                        "Use the following context to answer the user's question:\n\n"
-                        f"{retrieved_context}"
-                    ),
-                }
-            )
-
         for qa in self._chats[self.current_chat]:
             messages.append({"role": "user", "content": qa["question"]})
             messages.append({"role": "assistant", "content": qa["answer"]})
 
         # Remove the last mock answer.
         messages = messages[:-1]
+
+        # Retrieve relevant context via RAG pipeline (search -> rerank -> format)
+        # Combine context with the current question to avoid accumulating
+        # system messages in the conversation history.
+        retrieved_context = process_query(question)
+        if retrieved_context:
+            messages[-1]["content"] = (
+                "Use the following context to answer the user's question:\n\n"
+                f"{retrieved_context}\n\n"
+                f"Question: {question}"
+            )
 
         # Start a new session to answer the question (uses config values)
         # Model comes from config with env var override
