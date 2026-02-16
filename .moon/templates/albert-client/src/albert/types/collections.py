@@ -11,16 +11,21 @@ CollectionVisibility = Literal["private", "public"]
 
 
 class Collection(BaseModel):
-    """A collection in Albert API."""
+    """A collection in Albert API.
+
+    The ``POST /collections`` endpoint returns only ``{"id": ...}``,
+    so all fields except ``id`` are optional.  Full metadata is
+    returned by ``GET /collections`` and ``GET /collections/{id}``.
+    """
 
     object: str = "collection"
     id: int
-    name: str
-    owner: str
+    name: str | None = None
+    owner: str | None = None
     description: str | None = None
     visibility: CollectionVisibility | None = None
-    created: int
-    updated: int
+    created: int | None = None
+    updated: int | None = None
     documents: int = 0
 
 
