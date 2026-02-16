@@ -24,6 +24,24 @@ class MediaTechEntry(TypedDict):
 
 #: Maps collection name → metadata.
 #: IDs correspond to the etalab Albert API instance (albert.api.etalab.gouv.fr).
+# Reverse lookup: collection ID → name (built lazily)
+_id_to_name: dict[int, str] | None = None
+
+
+def get_collection_name(collection_id: int) -> str | None:
+    """Get the human-readable name for a collection ID.
+
+    Looks up the ID in the MediaTech catalog.  Returns *None* if the
+    ID is not a known MediaTech collection.
+    """
+    global _id_to_name  # noqa: PLW0603
+    if _id_to_name is None:
+        _id_to_name = {entry["id"]: name for name, entry in MEDIATECH_CATALOG.items()}
+    return _id_to_name.get(collection_id)
+
+
+#: Maps collection name → metadata.
+#: IDs correspond to the etalab Albert API instance (albert.api.etalab.gouv.fr).
 MEDIATECH_CATALOG: dict[str, MediaTechEntry] = {
     "service-public": {
         "id": 785,
