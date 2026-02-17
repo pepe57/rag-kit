@@ -3,8 +3,9 @@
 import os
 import shutil
 import subprocess
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_version
 from pathlib import Path
-from collections.abc import Callable
 from typing import Annotated, Literal, TypedDict
 
 import questionary
@@ -27,11 +28,27 @@ class PresetConfig(TypedDict):
     openai_base_url: str
 
 
-# Path constants for locating source files in development vs bundled mode
-REPO_ROOT = Path(__file__).resolve().parents[5]  # Root of rag-facile repository
-BUNDLED_ROOT = (
-    Path(__file__).resolve().parent.parent
-)  # cli/ directory in installed package
+# GitHub repository URL for installing the library from source
+_GITHUB_REPO = "https://github.com/etalab-ia/rag-facile.git"
+
+
+def _get_library_git_ref() -> dict[str, str]:
+    """Determine the git ref for rag-facile-lib and albert-client sources.
+
+    Returns a dict with either {"tag": "v0.15.0"} or {"branch": "main"}.
+    Priority: RAG_FACILE_BRANCH env var > CLI version tag > "main" fallback.
+    """
+    # Dev testing: use branch from env var (same pattern as install.sh)
+    branch = os.environ.get("RAG_FACILE_BRANCH")
+    if branch:
+        return {"branch": branch}
+
+    # Production: use tag matching CLI version
+    try:
+        cli_version = get_version("rag-facile-cli")
+        return {"tag": f"v{cli_version}"}
+    except PackageNotFoundError:
+        return {"branch": "main"}
 
 
 def setup_proto_paths() -> None:
@@ -230,156 +247,22 @@ def get_templates_dir() -> Path:
     )
 
 
-def _get_source_path(
-    dev_path_parts: tuple[str, ...],
-    bundle_path_parts: tuple[str, ...],
-    error_message: str,
-) -> Path:
-    """Helper to find a source path in development or bundled mode.
-
-    Args:
-        dev_path_parts: Path components relative to REPO_ROOT for development mode
-        bundle_path_parts: Path components relative to BUNDLED_ROOT for installed CLI
-        error_message: Error message to show if neither path exists
-
-    Returns:
-        Path to the source file/directory
-
-    Raises:
-        FileNotFoundError: If neither development nor bundled path exists
-    """
-    # In development mode, use the packages directory from repo root
-    local_source = REPO_ROOT.joinpath(*dev_path_parts)
-    if local_source.exists():
-        return local_source
-
-    # For installed CLI, source is bundled at cli/<name>_src
-    package_source = BUNDLED_ROOT.joinpath(*bundle_path_parts)
-    if package_source.exists():
-        return package_source
-
-    raise FileNotFoundError(error_message)
-
-
-def get_context_source() -> Path:
-    """Get the context source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "context", "src", "context"),
-        ("context_src",),
-        "context source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_reranking_source() -> Path:
-    """Get the reranking source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "reranking", "src", "reranking"),
-        ("reranking_src",),
-        "reranking source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_retrieval_source() -> Path:
-    """Get the retrieval source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "retrieval", "src", "retrieval"),
-        ("retrieval_src",),
-        "retrieval source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_storage_source() -> Path:
-    """Get the storage source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "storage", "src", "storage"),
-        ("storage_src",),
-        "storage source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_pipelines_source() -> Path:
-    """Get the pipelines source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "pipelines", "src", "pipelines"),
-        ("pipelines_src",),
-        "pipelines source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_ingestion_source() -> Path:
-    """Get the ingestion source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "ingestion", "src", "ingestion"),
-        ("ingestion_src",),
-        "ingestion source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_albert_client_source() -> Path:
-    """Get the albert-client source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "albert-client", "src", "albert"),
-        ("albert_src",),
-        "albert-client source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
-def get_rag_core_source() -> Path:
-    """Get the rag-core source directory for inline copying."""
-    return _get_source_path(
-        ("packages", "rag-core", "src", "rag_core"),
-        ("rag_core_src",),
-        "rag-core source not found. This is a packaging error - please reinstall the CLI.",
-    )
-
-
 def get_default_config_template() -> Path:
     """Get the default ragfacile.toml template."""
-    return _get_source_path(
-        ("apps", "cli", "src", "cli", "templates", "ragfacile.toml"),
-        ("templates", "ragfacile.toml"),
-        "ragfacile.toml template not found. This is a packaging error - please reinstall the CLI.",
+    # Try bundled location (installed CLI)
+    bundled = Path(__file__).resolve().parent.parent / "templates" / "ragfacile.toml"
+    if bundled.exists():
+        return bundled
+
+    # Try development location (repo structure)
+    repo_root = Path(__file__).resolve().parents[5]
+    dev = repo_root / "apps" / "cli" / "src" / "cli" / "templates" / "ragfacile.toml"
+    if dev.exists():
+        return dev
+
+    raise FileNotFoundError(
+        "ragfacile.toml template not found. This is a packaging error - please reinstall the CLI."
     )
-
-
-def _copy_module_to_standalone(
-    target_path: Path,
-    module_name: str,
-    get_source_func: Callable[[], Path],
-    display_name: str,
-    step: int,
-) -> None:
-    """Copy a package module into a standalone project directory.
-
-    Handles directory cleanup, __pycache__ removal, and user-facing
-    progress output.  Used by :func:`generate_standalone` to inline
-    pipeline packages (albert, rag_core, context, ingestion, reranking, retrieval, storage, pipelines).
-
-    Args:
-        target_path: Root of the standalone project.
-        module_name: Directory name for the copied module (e.g. ``"rag_core"``).
-        get_source_func: Callable that returns the source :class:`Path`.
-        display_name: Human-readable name for console output.
-        step: Step number shown in the progress output.
-    """
-    console.print()
-    console.print(f"[bold green]Step {step}:[/bold green] Adding {display_name}...")
-
-    try:
-        source = get_source_func()
-        target_dir = target_path / module_name
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        shutil.copytree(source, target_dir)
-        pycache = target_dir / "__pycache__"
-        if pycache.exists():
-            shutil.rmtree(pycache)
-        console.print(f"[green]✓[/green] {display_name} added")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print(
-            f"[yellow]You'll need to install {module_name} manually.[/yellow]"
-        )
 
 
 def render_template_file(template_path: Path, variables: dict[str, str | bool]) -> str:
@@ -442,9 +325,9 @@ def generate_config_file(
         preset_config: Preset configuration dict with model_alias, temperature, etc.
         selected_modules: List of selected modules to determine storage backend
     """
-    from rag_core import RAGConfig
-    from rag_core.loader import save_config
-    from rag_core.schema import (
+    from rag_facile.core import RAGConfig
+    from rag_facile.core.loader import save_config
+    from rag_facile.core.schema import (
         ChunkingConfig,
         EvalConfig,
         FormattingConfig,
@@ -519,6 +402,10 @@ def generate_standalone(
         "welcome_message": f"Welcome to {project_name}!",
     }
 
+    # Determine git ref for library sources
+    git_ref = _get_library_git_ref()
+    ref_key, ref_value = next(iter(git_ref.items()))
+
     # Step 1: Create target directory
     console.print()
     console.print("[bold green]Step 1:[/bold green] Creating project directory...")
@@ -530,29 +417,31 @@ def generate_standalone(
     console.print()
     console.print("[bold green]Step 2:[/bold green] Generating project files...")
 
-    # Create pyproject.toml for standalone mode
-    # pypdf required for both Local and Albert RAG (albert has local fallback)
-    pdf_dep = (
-        '\n    "pypdf>=5.0.0",'
-        if ("Local" in selected_modules or "Albert RAG" in selected_modules)
-        else ""
-    )
-    # Single source of truth for pipeline modules copied into standalone projects.
-    # Used both for setuptools packages list and for the copy loop below.
-    modules_to_copy = [
-        ("albert", get_albert_client_source, "Albert client module"),
-        ("rag_core", get_rag_core_source, "RAG core module"),
-        ("context", get_context_source, "context module"),
-        ("ingestion", get_ingestion_source, "ingestion module"),
-        ("reranking", get_reranking_source, "reranking module"),
-        ("retrieval", get_retrieval_source, "retrieval module"),
-        ("storage", get_storage_source, "storage module"),
-        ("pipelines", get_pipelines_source, "pipelines module"),
-    ]
-    setuptools_packages_list = sorted([module[0] for module in modules_to_copy])
-    setuptools_packages = f"packages = {setuptools_packages_list}"
+    # Build uv.sources for library and albert-client
+    uv_sources = f"""[tool.uv.sources]
+rag-facile-lib = {{ git = "{_GITHUB_REPO}", {ref_key} = "{ref_value}", subdirectory = "packages/rag-facile-lib" }}
+albert-client = {{ git = "{_GITHUB_REPO}", {ref_key} = "{ref_value}", subdirectory = "packages/albert-client" }}
+"""
 
-    # For standalone, all pipeline packages are local modules (not dependencies)
+    # Frontend-specific dependency and setuptools config
+    snake_name = project_name.replace("-", "_")
+    if frontend_choice == "Chainlit":
+        frontend_dep = '"chainlit>=1.3.0",'
+        # app.py at root (Chainlit convention) + src/<name>/ for user code
+        setuptools_block = """\
+[tool.setuptools]
+py-modules = ["app"]
+
+[tool.setuptools.packages.find]
+where = ["src"]"""
+    else:
+        frontend_dep = '"reflex>=0.7.0",'
+        # App package at root, src/ for additional user code
+        setuptools_block = f"""\
+[tool.setuptools.packages.find]
+include = ["{snake_name}*"]
+where = [".", "src"]"""
+
     pyproject_content = f'''[project]
 name = "{project_name}"
 version = "0.1.0"
@@ -560,44 +449,17 @@ description = "{variables["description"]}"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "chainlit>=1.3.0",
-    "httpx>=0.24.0",
-    "openai>=1.0.0",
-    "pydantic>=2.0.0",
+    "rag-facile-lib",
+    {frontend_dep}
     "python-dotenv>=1.0.0",
-    "tomli-w>=1.0.0",{pdf_dep}
 ]
 
-[tool.setuptools]
-py-modules = ["app"]
-{setuptools_packages}
+{setuptools_block}
 
 [tool.uv]
 package = true
-'''
 
-    if frontend_choice == "Reflex":
-        pyproject_content = f'''[project]
-name = "{project_name}"
-version = "0.1.0"
-description = "{variables["description"]}"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "reflex>=0.7.0",
-    "httpx>=0.24.0",
-    "openai>=1.0.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "tomli-w>=1.0.0",{pdf_dep}
-]
-
-[tool.setuptools]
-{setuptools_packages}
-
-[tool.uv]
-package = true
-'''
+{uv_sources}'''
 
     (target_path / "pyproject.toml").write_text(pyproject_content)
     console.print("[dim]  ✓ pyproject.toml[/dim]")
@@ -646,41 +508,19 @@ package = true
                     target_file.write_text(content)
                     console.print(f"[dim]  ✓ {snake_name}/{rel_path_str}[/dim]")
 
+    # Create src/<project_name>/ for user's own modules
+    src_dir = target_path / "src" / snake_name
+    src_dir.mkdir(parents=True)
+    (src_dir / "__init__.py").write_text("")
+    console.print(f"[dim]  ✓ src/{snake_name}/__init__.py[/dim]")
+
     console.print("[green]✓[/green] Project files generated")
 
-    # Steps 3-10: Copy pipeline modules as local packages
-    for i, (module_name, source_func, display_name) in enumerate(
-        modules_to_copy, start=3
-    ):
-        _copy_module_to_standalone(
-            target_path, module_name, source_func, display_name, step=i
-        )
-
-    # Step 8: Create ragfacile.toml config file
-    step_num = 8 if "Local" in selected_modules else 7
+    # Step 3: Create configuration files
     console.print()
-    console.print(
-        f"[bold green]Step {step_num}:[/bold green] Creating configuration file..."
-    )
+    console.print("[bold green]Step 3:[/bold green] Creating configuration files...")
 
-    try:
-        config_template = get_default_config_template()
-        target_config = target_path / "ragfacile.toml"
-        shutil.copy(config_template, target_config)
-        console.print("[green]✓[/green] Created ragfacile.toml (balanced preset)")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print(
-            "[yellow]You can create config later with: rag-facile config preset apply balanced[/yellow]"
-        )
-
-    # Step 9: Create .env file
-    step_num = 9 if "Local" in selected_modules else 8
-    console.print()
-    console.print(
-        f"[bold green]Step {step_num}:[/bold green] Creating environment file..."
-    )
-
+    # Create .env file
     env_content = f"""\
 OPENAI_API_KEY={env_config["openai_api_key"]}
 OPENAI_BASE_URL={env_config["openai_base_url"]}
@@ -689,11 +529,10 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
     console.print("[green]✓[/green] Created .env file")
 
     # Generate ragfacile.toml with preset configuration
-    console.print("[dim]  ✓ Generating configuration...[/dim]")
     generate_config_file(target_path, preset, preset_config, selected_modules)
     console.print("[green]✓[/green] Created ragfacile.toml")
 
-    # Step 5: Create .python-version
+    # Create .python-version
     (target_path / ".python-version").write_text("3.13\n")
     console.print("[dim]  ✓ .python-version[/dim]")
 
@@ -701,24 +540,20 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
     console.print()
     console.print("[bold green]✨ Project generation complete![/bold green]")
 
-    # Step 6: Install dependencies
-    step_num += 1
+    # Step 4: Install dependencies
     console.print()
-    console.print(
-        f"[bold green]Step {step_num}:[/bold green] Installing dependencies..."
-    )
+    console.print("[bold green]Step 4:[/bold green] Installing dependencies...")
     if not run_command(["uv", "sync"], "install dependencies", cwd=target_path):
         console.print("[yellow]Warning: uv sync failed. Run it manually.[/yellow]")
 
-    # Step 7: Start the dev server (unless --no-serve)
+    # Step 5: Start the dev server (unless --no-serve)
     if no_serve:
         _print_no_serve_message(target_display)
         return
 
-    step_num += 1
     console.print()
     console.print(
-        f"[bold green]Step {step_num}:[/bold green] Starting {frontend_choice} dev server..."
+        f"[bold green]Step 5:[/bold green] Starting {frontend_choice} dev server..."
     )
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
@@ -956,120 +791,190 @@ def run(
         )
         return  # Exit after standalone generation
 
-    # ========== MONOREPO GENERATION (existing flow) ==========
+    # ========== MONOREPO GENERATION ==========
 
-    # Get templates directory
-    templates_dir = get_templates_dir()
-    if not templates_dir.exists():
-        console.print(
-            f"[red]Error: Templates directory not found at {templates_dir}[/red]"
-        )
-        console.print(
-            "[dim]Make sure you're running from within the rag-facile repository.[/dim]"
-        )
-        raise typer.Exit(1)
+    import shutil
 
-    # 2. Bootstrap with moon init
+    # 1. Bootstrap with moon init
     console.print()
     console.print("[bold green]Step 1:[/bold green] Initializing Moon workspace...")
     if not target_path.exists():
         target_path.mkdir(parents=True)
 
-    # moon init must be run from within the target directory
-    if not run_command(
-        ["moon", "init", "--yes"],
-        "moon init",
-        cwd=target_path,
-    ):
+    if not run_command(["moon", "init", "--yes"], "moon init", cwd=target_path):
         raise typer.Exit(1)
     console.print("[green]✓[/green] Moon workspace initialized")
 
-    # 3. Apply system configuration patch
+    # 2. Write workspace configuration files directly (no sys-config template needed)
     console.print()
     console.print(
         "[bold green]Step 2:[/bold green] Applying RAG Facile configuration..."
     )
+    moon_dir = target_path / ".moon"
+    moon_dir.mkdir(
+        parents=True, exist_ok=True
+    )  # Ensure .moon/ exists (moon init creates it; this is a safety net)
 
-    # Copy templates to target (moon generate expects templates in the workspace)
-    target_templates = target_path / ".moon" / "templates"
-    if not target_templates.exists():
-        target_templates.mkdir(parents=True)
+    (moon_dir / "toolchain.yml").write_text(
+        "$schema: 'https://moonrepo.dev/schemas/toolchain.json'\n"
+        "python:\n"
+        "  version: '3.13.11'\n"
+        "  packageManager: uv\n"
+    )
+    console.print("[dim]  ✓ .moon/toolchain.yml[/dim]")
 
-    # Copy all templates to target workspace
-    import shutil
+    (moon_dir / "workspace.yml").write_text(
+        "projects:\n"
+        "  - 'apps/*'\n"
+        "  - 'packages/*'\n"
+        "vcs:\n"
+        "  manager: git\n"
+        "  defaultBranch: main\n"
+        "telemetry: false\n"
+        "generator:\n"
+        "  templates:\n"
+        "    - .moon/templates\n"
+    )
+    console.print("[dim]  ✓ .moon/workspace.yml[/dim]")
 
-    console.print(f"[dim]Copying templates from {templates_dir}[/dim]")
-    for template_name in [
-        "sys-config",
-        "chainlit-chat",
-        "reflex-chat",
-        "albert-client",
-        "ingestion",
-        "pipelines",
-        "rag-core",
-        "retrieval",
-    ]:
-        src = templates_dir / template_name
-        dst = target_templates / template_name
-        if src.exists():
-            if dst.exists():
-                shutil.rmtree(dst)
-            shutil.copytree(src, dst)
-            console.print(f"[dim]  ✓ {template_name}[/dim]")
-        else:
-            console.print(f"[yellow]  ⚠ {template_name} not found at {src}[/yellow]")
+    (target_path / "pyproject.toml").write_text(
+        "[project]\n"
+        f'name = "{target_path.name}"\n'
+        'version = "0.1.0"\n'
+        'description = "RAG Facile workspace"\n'
+        'requires-python = ">=3.13"\n'
+        "dependencies = []\n"
+        "\n"
+        "[dependency-groups]\n"
+        'dev = ["ruff>=0.9", "ty>=0.0.1a7"]\n'
+        "\n"
+        "[tool.ruff]\n"
+        "# Exclude moon templates (contain Jinja2 syntax, not valid Python/TOML)\n"
+        'extend-exclude = [".moon/templates"]\n'
+        "\n"
+        "[tool.ruff.lint]\n"
+        'exclude = [".moon/templates"]\n'
+        "\n"
+        "[tool.ruff.format]\n"
+        'exclude = [".moon/templates"]\n'
+        "\n"
+        "[tool.ty.src]\n"
+        'exclude = [".moon/templates"]\n'
+        "\n"
+        "[tool.uv]\n"
+        "managed = true\n"
+        "\n"
+        "[tool.uv.workspace]\n"
+        'members = ["apps/*", "packages/*"]\n'
+    )
+    console.print("[dim]  ✓ pyproject.toml[/dim]")
 
-    # Patch workspace.yml to add generator.templates BEFORE running moon generate
-    # (moon needs this config to find templates, but sys-config template provides it)
-    workspace_yml = target_path / ".moon" / "workspace.yml"
-    if workspace_yml.exists():
-        import yaml
+    (target_path / ".python-version").write_text("3.13\n")
+    console.print("[dim]  ✓ .python-version[/dim]")
 
-        with open(workspace_yml) as f:
-            config = yaml.safe_load(f) or {}
-        if "generator" not in config:
-            config["generator"] = {"templates": [".moon/templates"]}
-            with open(workspace_yml, "w") as f:
-                yaml.dump(config, f, default_flow_style=False)
-            console.print("[dim]  ✓ Added generator.templates config[/dim]")
+    (target_path / ".prototools").write_text(
+        f"# Proto toolchain configuration for {target_path.name}\n"
+        'python = "3.13.11"\n'
+        "\n"
+        "[plugins]\n"
+        'just = "source:https://raw.githubusercontent.com/Phault/proto-toml-plugins/main/just/plugin.toml"\n'
+        "\n"
+        "[tools.just]\n"
+        'version = "1.34.0"\n'
+    )
+    console.print("[dim]  ✓ .prototools[/dim]")
 
-    # Run moon generate for sys-config (DEST is . since we're in the target)
-    sys_config_cmd = ["moon", "generate", "sys-config", ".", "--defaults", "--force"]
-    if not run_command(sys_config_cmd, "apply system config", cwd=target_path):
-        raise typer.Exit(1)
-    console.print("[green]✓[/green] System configuration applied")
+    (target_path / "justfile").write_text(
+        f"# {target_path.name} - RAG Facile project\n"
+        "\n"
+        "# Display available commands\n"
+        "default:\n"
+        "    @just --list\n"
+        "\n"
+        "# Run a specific app (e.g., just run chainlit-chat)\n"
+        "run name:\n"
+        '    cd "apps/{{{{ name }}}}" && just run\n'
+        "\n"
+        "# Format code (write changes)\n"
+        "format:\n"
+        "    uv run ruff format .\n"
+        "\n"
+        "# Check formatting without writing\n"
+        "format-check:\n"
+        "    uv run ruff format --check .\n"
+        "\n"
+        "# Run linter\n"
+        "lint:\n"
+        "    uv run ruff check .\n"
+        "\n"
+        "# Run linter with auto-fix\n"
+        "lint-fix:\n"
+        "    uv run ruff check --fix .\n"
+        "\n"
+        "# Run type checker\n"
+        "type-check:\n"
+        "    uv run ty check .\n"
+        "\n"
+        "# Run all checks (format-check, lint, type-check)\n"
+        "check: format-check lint type-check\n"
+        "\n"
+        "# Sync dependencies and install pre-commit hooks\n"
+        "sync:\n"
+        "    uv sync\n"
+        "    uv run pre-commit install\n"
+        "\n"
+        "# Add a new app from template (e.g., just add chainlit-chat)\n"
+        "add template:\n"
+        "    moon generate {{{{template}}}}\n"
+    )
+    console.print("[dim]  ✓ justfile[/dim]")
+    console.print("[green]✓[/green] Workspace configuration written")
 
-    # 4. Generate the app with feature flags
+    # 3. Copy app template and run moon generate for the frontend
     console.print()
     console.print(
         f"[bold green]Step 3:[/bold green] Generating {frontend_choice} app..."
     )
 
+    # Copy only the frontend template (pipeline packages come from rag-facile-lib)
     frontend_template = FRONTENDS[frontend_choice]
-    # Don't pass DEST - let template.yml destination be used
+    templates_dir = get_templates_dir()
+    target_templates = moon_dir / "templates"
+    target_templates.mkdir(parents=True, exist_ok=True)
+
+    src_tmpl = templates_dir / frontend_template
+    dst_tmpl = target_templates / frontend_template
+    if dst_tmpl.exists():
+        shutil.rmtree(dst_tmpl)
+    shutil.copytree(src_tmpl, dst_tmpl)
+    console.print(f"[dim]  ✓ copied {frontend_template} template[/dim]")
+
+    # Build moon generate command; inject git ref for rag-facile-lib
+    git_ref = _get_library_git_ref()
+    ref_key, ref_value = next(iter(git_ref.items()))
+
     app_cmd = ["moon", "generate", frontend_template, "--defaults"]
     if force:
         app_cmd.append("--force")
-
-    # Add template variables and feature flags after --
-    app_cmd.append("--")
-
-    # Pass env config values to moon template
-    app_cmd.append(f"--openai_api_key={env_config['openai_api_key']}")
-    app_cmd.append(f"--openai_base_url={env_config['openai_base_url']}")
+    app_cmd.extend(
+        [
+            "--",
+            f"--openai_api_key={env_config['openai_api_key']}",
+            f"--openai_base_url={env_config['openai_base_url']}",
+            f"--rag_facile_ref_key={ref_key}",
+            f"--rag_facile_ref_value={ref_value}",
+        ]
+    )
 
     if not run_command(app_cmd, f"generate {frontend_template}", cwd=target_path):
         raise typer.Exit(1)
     console.print(f"[green]✓[/green] {frontend_choice} app generated")
 
     # Post-generation: rename Reflex app package to match project_name
-    # Moon templates can't use filters in directory names, so the template
-    # generates a static "app/" directory that needs renaming.
     if frontend_choice == "Reflex":
         app_dir = target_path / "apps" / frontend_template
         static_pkg = app_dir / "app"
         if static_pkg.exists():
-            # Read project_name from rxconfig.py to get the actual app_name
             rxconfig = app_dir / "rxconfig.py"
             if rxconfig.exists():
                 import re
@@ -1079,107 +984,31 @@ def run(
                     app_module_name = match.group(1)
                     target_pkg = app_dir / app_module_name
                     static_pkg.rename(target_pkg)
-                    # Rename app.py to {module_name}.py inside the package
                     static_main = target_pkg / "app.py"
                     if static_main.exists():
                         static_main.rename(target_pkg / f"{app_module_name}.py")
                     console.print(f"[dim]  ✓ Renamed app/ → {app_module_name}/[/dim]")
 
-    # Create .env file from template values
-    app_dir = target_path / "apps" / frontend_template
-    env_file = app_dir / ".env"
+    # 4. Create config and env files
+    console.print()
+    console.print("[bold green]Step 4:[/bold green] Creating configuration files...")
+
     env_content = f"""\
 OPENAI_API_KEY={env_config["openai_api_key"]}
 OPENAI_BASE_URL={env_config["openai_base_url"]}
 """
-    env_file.write_text(env_content)
-    console.print("[green]✓[/green] Created .env file")
+    # .env at workspace root (apps pick it up via direnv)
+    (target_path / ".env").write_text(env_content)
+    console.print("[green]✓[/green] Created .env")
 
-    # Generate ragfacile.toml at workspace root with preset configuration
-    console.print("[dim]  ✓ Generating configuration...[/dim]")
+    # Also write .env into the generated app directory
+    app_dir = target_path / "apps" / frontend_template
+    (app_dir / ".env").write_text(env_content)
+
     generate_config_file(target_path, preset, preset_config, selected_modules)
-    console.print("[green]✓[/green] Created ragfacile.toml at workspace root")
+    console.print("[green]✓[/green] Created ragfacile.toml")
 
-    # Create .env at workspace root (in addition to app-level .env)
-    root_env_file = target_path / ".env"
-    root_env_file.write_text(env_content)
-    console.print("[green]✓[/green] Created .env file at workspace root")
-
-    # 4. Generate albert-client package (always required)
-    console.print()
-    console.print(
-        "[bold green]Step 4:[/bold green] Generating albert-client package..."
-    )
-    albert_cmd = ["moon", "generate", "albert-client", "--defaults"]
-    if force:
-        albert_cmd.append("--force")
-    if not run_command(albert_cmd, "generate albert-client", cwd=target_path):
-        raise typer.Exit(1)
-    console.print("[green]✓[/green] albert-client package generated")
-
-    # 5. Generate rag-core package (always required for config management)
-    console.print()
-    console.print("[bold green]Step 5:[/bold green] Generating rag-core package...")
-    config_cmd = ["moon", "generate", "rag-core", "--defaults"]
-    if force:
-        config_cmd.append("--force")
-    if not run_command(config_cmd, "generate rag-core", cwd=target_path):
-        raise typer.Exit(1)
-    console.print("[green]✓[/green] rag-core package generated")
-
-    # Copy ragfacile.toml config file to workspace root
-    try:
-        config_template = get_default_config_template()
-        target_config = target_path / "ragfacile.toml"
-        shutil.copy(config_template, target_config)
-        console.print("[green]✓[/green] Created ragfacile.toml (balanced preset)")
-    except FileNotFoundError as e:
-        console.print(f"[yellow]Warning: {e}[/yellow]")
-        console.print(
-            "[yellow]You can create config later with: rag-facile config preset apply balanced[/yellow]"
-        )
-
-    # 6. Generate ingestion package (always required for document parsing)
-    console.print()
-    console.print("[bold green]Step 6:[/bold green] Generating ingestion package...")
-    ingestion_cmd = ["moon", "generate", "ingestion", "--defaults"]
-    if force:
-        ingestion_cmd.append("--force")
-    if not run_command(ingestion_cmd, "generate ingestion", cwd=target_path):
-        raise typer.Exit(1)
-    console.print("[green]✓[/green] ingestion package generated")
-
-    # 7. Generate pipelines package (always required for pipeline coordination)
-    console.print()
-    console.print("[bold green]Step 7:[/bold green] Generating pipelines package...")
-    pipelines_cmd = ["moon", "generate", "pipelines", "--defaults"]
-    if force:
-        pipelines_cmd.append("--force")
-    if not run_command(pipelines_cmd, "generate pipelines", cwd=target_path):
-        raise typer.Exit(1)
-    console.print("[green]✓[/green] pipelines package generated")
-
-    # 8. Generate selected packages
-    if selected_modules:
-        console.print()
-        console.print("[bold green]Step 8:[/bold green] Generating packages...")
-
-        # Collect unique templates (both PDF and Albert RAG use same retrieval template)
-        templates_to_generate = set()
-        for module in selected_modules:
-            module_info = MODULES[module]
-            if module_info["available"]:
-                templates_to_generate.add(str(module_info["template"]))
-
-        for template_name in templates_to_generate:
-            console.print(f"  Generating {template_name}...")
-            # Don't pass DEST - let the template.yml destination be used
-            pkg_cmd: list[str] = ["moon", "generate", template_name, "--defaults"]
-            if force:
-                pkg_cmd.append("--force")
-            if not run_command(pkg_cmd, f"generate {template_name}", cwd=target_path):
-                raise typer.Exit(1)
-            console.print(f"  [green]✓[/green] {template_name} package generated")
+    (target_path / ".python-version").write_text("3.13\n")
 
     # Done with generation!
     console.print()
@@ -1187,7 +1016,7 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
 
     # Run uv sync to install dependencies
     console.print()
-    console.print("[bold green]Step 9:[/bold green] Installing dependencies...")
+    console.print("[bold green]Step 5:[/bold green] Installing dependencies...")
     if not run_command(["uv", "sync"], "install dependencies", cwd=target_path):
         console.print("[yellow]Warning: uv sync failed. Run it manually.[/yellow]")
 
@@ -1198,7 +1027,7 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
 
     console.print()
     console.print(
-        f"[bold green]Step 10:[/bold green] Starting {frontend_choice} dev server..."
+        f"[bold green]Step 6:[/bold green] Starting {frontend_choice} dev server..."
     )
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
