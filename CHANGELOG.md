@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0](https://github.com/etalab-ia/rag-facile/compare/v0.13.0...v0.14.0) (2026-02-17)
+
+
+### Features
+
+* add `rag-facile uninstall` and `rag-facile upgrade` commands ([6dcb688](https://github.com/etalab-ia/rag-facile/commit/6dcb688d10f35264948e9946b0f7e3103af2b6f0))
+* add `rag-facile uninstall` and `rag-facile upgrade` commands ([5c39988](https://github.com/etalab-ia/rag-facile/commit/5c3998898d247f809d229e924692875bfc6eb2e1))
+
+
+### Bug Fixes
+
+* bundle context and reranking to correct paths for standalone setup ([9f753d9](https://github.com/etalab-ia/rag-facile/commit/9f753d9eca6934eb2c1ba9ecde370614dc7ac7f3))
+* bundle context and reranking to correct paths for standalone setup ([a4bf035](https://github.com/etalab-ia/rag-facile/commit/a4bf0353508ae743b91296d3ede7af80c21f7422))
+* default uninstall removes CLI only, --all for toolchain ([3bb4d52](https://github.com/etalab-ia/rag-facile/commit/3bb4d525d893dc9ccf7d8cd24ab92aa8f3973dc8))
+* display CLI commands in alphabetical order ([37a2d57](https://github.com/etalab-ia/rag-facile/commit/37a2d570dbd3b15be99e665a4fe7ad8b9fb1c9ef))
+
+## [0.13.0](https://github.com/etalab-ia/rag-facile/compare/v0.12.1...v0.13.0) (2026-02-17)
+
+
+### Features
+
+* add --expert flag to setup command and rename PDF pipeline to Local ([4c8b584](https://github.com/etalab-ia/rag-facile/commit/4c8b584bf156cadd212277d104bc41699699186a))
+* add --expert flag to setup command and rename PDF pipeline to Local ([3605a5a](https://github.com/etalab-ia/rag-facile/commit/3605a5a12555b1e961994c3243b0b7559f55a8da))
+* add interactive collection badges to chat apps ([fadd438](https://github.com/etalab-ia/rag-facile/commit/fadd4385bc532dd1093e7b2131d69adb151ca377))
+* add support for public Albert collections as RAG sources ([6d9ec12](https://github.com/etalab-ia/rag-facile/commit/6d9ec12b07b6a8429190c15f02609074e81dabc4))
+* add support for public Albert collections as RAG sources ([4fc5903](https://github.com/etalab-ia/rag-facile/commit/4fc5903088262b3046319e692fb5323cfbf550ac))
+
+
+### Bug Fixes
+
+* add missing open_browser.py script for reflex-chat auto-open ([b2f20be](https://github.com/etalab-ia/rag-facile/commit/b2f20be35ce2abaca278b7dca72ece07922d3a48))
+* bypass moon for app dev server to prevent dangling processes ([cbc9b59](https://github.com/etalab-ia/rag-facile/commit/cbc9b59ecff653fc7daf0960558182278f85aa8e))
+* bypass moon for app dev server to prevent dangling processes ([a9a05c4](https://github.com/etalab-ia/rag-facile/commit/a9a05c48c6ed576c3b1adc5189e84dc128efa7d2))
+* remove --public flag, add real MediaTech collection IDs to presets ([c301381](https://github.com/etalab-ia/rag-facile/commit/c3013814b4a857548c28d74886ad4c8a6f0dde21))
+* resolve CI test failure from Rich ANSI codes in assertion ([79bc659](https://github.com/etalab-ia/rag-facile/commit/79bc65911313e1e1913f39b3b86f4ab2b47266b0))
+* restore browser opener in reflex-chat moon.yml ([f6bbae2](https://github.com/etalab-ia/rag-facile/commit/f6bbae22324e955dd69e6b6e02af3b07874b724d))
+
 ## [0.12.1](https://github.com/etalab-ia/rag-facile/compare/v0.12.0...v0.12.1) (2026-02-16)
 
 
