@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+import shlex
 from typing import TYPE_CHECKING, Any
 
 import httpx
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,6 +31,123 @@ if TYPE_CHECKING:
         RerankResponse,
         SearchResponse,
         UsageList,
+    )
+
+
+_MAX_BODY_LOG = 2000  # Truncate request/response bodies in logs
+_OPENGATELLM_REPO = "etalab-ia/OpenGateLLM"
+
+
+def _log_api_error(
+    method: str,
+    path: str,
+    kwargs: dict[str, Any],
+    response: httpx.Response,
+) -> None:
+    """Log a detailed diagnostic when the Albert API returns an error.
+
+    Captures the HTTP method, endpoint, request payload, and response body
+    so that errors can be reported to the API team without needing to reproduce.
+    No credentials are included in the log output.
+
+    For 5xx errors, also prints a ready-to-use ``gh issue create`` command
+    targeting the OpenGateLLM repository.
+    """
+    level = logging.ERROR if response.status_code >= 500 else logging.WARNING
+
+    # Extract the request payload (json body or form data), skip file uploads
+    request_body: str | None = None
+    if "json" in kwargs:
+        try:
+            request_body = json.dumps(kwargs["json"], ensure_ascii=False)
+            if len(request_body) > _MAX_BODY_LOG:
+                request_body = request_body[:_MAX_BODY_LOG] + "…(truncated)"
+        except (TypeError, ValueError):
+            request_body = repr(kwargs["json"])[:_MAX_BODY_LOG]
+
+    # Extract the response body
+    response_text = response.text[:_MAX_BODY_LOG] if response.text else "(empty)"
+    if len(response.text) > _MAX_BODY_LOG:
+        response_text += "…(truncated)"
+
+    lines = [
+        f"Albert API error on {method.upper()} {path} (HTTP {response.status_code})",
+    ]
+    if request_body:
+        lines.append(f"  Request: {request_body}")
+    lines.append(f"  Response: {response_text}")
+
+    logger.log(level, "\n".join(lines))
+
+    # For server errors, print a gh command to file an issue on OpenGateLLM
+    if response.status_code >= 500:
+        _print_gh_issue_command(method, path, response, request_body, response_text)
+
+
+def _print_gh_issue_command(
+    method: str,
+    path: str,
+    response: httpx.Response,
+    request_body: str | None,
+    response_text: str,
+) -> None:
+    """Print a ready-to-use ``gh issue create`` command for the OpenGateLLM repo."""
+    title = f"[Bug] {method.upper()} {path} returns {response.status_code}"
+
+    body_parts = [
+        "## Bug Report",
+        "",
+        f"**Endpoint:** `{method.upper()} {path}`",
+        f"**HTTP Status:** {response.status_code}",
+        "",
+    ]
+
+    if request_body:
+        body_parts += [
+            "### Request payload",
+            "",
+            "```json",
+            request_body,
+            "```",
+            "",
+        ]
+
+    body_parts += [
+        "### Response body",
+        "",
+        "```json",
+        response_text,
+        "```",
+        "",
+        "### Reproduction",
+        "",
+        "```bash",
+        f"curl -s -X {method.upper()} \\",
+        '  -H "Authorization: Bearer $ALBERT_API_KEY" \\',
+    ]
+
+    if request_body:
+        body_parts.append('  -H "Content-Type: application/json" \\')
+        body_parts.append(f"  -d '{request_body}' \\")
+
+    base_url = str(response.request.url).rsplit(path, 1)[0]
+    body_parts += [
+        f"  {base_url}{path}",
+        "```",
+    ]
+
+    body = "\n".join(body_parts)
+
+    gh_cmd = (
+        f"gh issue create"
+        f" --repo {_OPENGATELLM_REPO}"
+        f" --title {shlex.quote(title)}"
+        f" --body {shlex.quote(body)}"
+    )
+
+    logger.error(
+        "To report this issue to the Albert API team, run:\n\n%s\n",
+        gh_cmd,
     )
 
 
@@ -139,7 +261,12 @@ class AlbertClient:
 
         # Get the HTTP method from the internal httpx client
         http_method = getattr(self._client._client, method)
-        return http_method(path, **kwargs)
+        response = http_method(path, **kwargs)
+
+        if response.status_code >= 400:
+            _log_api_error(method, path, kwargs, response)
+
+        return response
 
     # Search and Rerank methods
 

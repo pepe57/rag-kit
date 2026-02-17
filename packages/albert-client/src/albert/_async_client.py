@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from openai import AsyncOpenAI
 
+from albert.client import _log_api_error
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -128,7 +130,12 @@ class AsyncAlbertClient:
         kwargs["headers"] = headers
 
         http_method = getattr(self._client._client, method)
-        return await http_method(path, **kwargs)
+        response = await http_method(path, **kwargs)
+
+        if response.status_code >= 400:
+            _log_api_error(method, path, kwargs, response)
+
+        return response
 
     # Search and Rerank methods
 
