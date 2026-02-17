@@ -140,17 +140,25 @@ class TestCollectItemsToRemove:
         labels = [label for label, _, _ in items]
         assert "rag-facile CLI" in labels
 
-    def test_always_includes_proto_tools(self):
-        """Should always include proto-managed tools."""
+    def test_default_only_includes_cli(self):
+        """Default should only include rag-facile CLI."""
         items = _collect_items_to_remove()
+        labels = [label for label, _, _ in items]
+        assert "rag-facile CLI" in labels
+        assert "moon" not in labels
+        assert "proto" not in labels
+
+    def test_include_tools_adds_proto_tools(self):
+        """With include_tools=True, should include proto-managed tools."""
+        items = _collect_items_to_remove(include_tools=True)
         labels = [label for label, _, _ in items]
         assert "moon" in labels
         assert "uv" in labels
         assert "just" in labels
 
-    def test_always_includes_proto(self):
-        """Should always include proto itself."""
-        items = _collect_items_to_remove()
+    def test_include_tools_adds_proto(self):
+        """With include_tools=True, should include proto itself."""
+        items = _collect_items_to_remove(include_tools=True)
         labels = [label for label, _, _ in items]
         assert "proto" in labels
 
@@ -210,9 +218,26 @@ class TestUninstallCommand:
             assert result.exit_code == 0
             assert "cancelled" in result.output
 
-    def test_yes_flag_skips_confirmation(self):
-        """Should skip confirmation with --yes flag."""
+    def test_yes_flag_removes_cli_only(self):
+        """Default --yes should only remove the CLI, not the toolchain."""
         items = [("rag-facile CLI", "/usr/local/bin/rag-facile", True)]
+        with (
+            patch(
+                "cli.commands.uninstall._collect_items_to_remove", return_value=items
+            ),
+            patch("cli.commands.uninstall._tool_exists", return_value=False),
+            patch("cli.commands.uninstall._remove_cli_manually"),
+        ):
+            result = runner.invoke(main_app, ["uninstall", "--yes"])
+            assert result.exit_code == 0
+            assert "CLI has been uninstalled" in result.output
+
+    def test_all_flag_removes_toolchain(self):
+        """--all --yes should remove the CLI and the full toolchain."""
+        items = [
+            ("rag-facile CLI", "/usr/local/bin/rag-facile", True),
+            ("moon", "proto-managed tool", True),
+        ]
         with (
             patch(
                 "cli.commands.uninstall._collect_items_to_remove", return_value=items
@@ -223,6 +248,17 @@ class TestUninstallCommand:
             patch("cli.commands.uninstall._is_windows", return_value=False),
             patch("cli.commands.uninstall._clean_shell_profile", return_value=False),
         ):
-            result = runner.invoke(main_app, ["uninstall", "--yes"])
+            result = runner.invoke(main_app, ["uninstall", "--all", "--yes"])
             assert result.exit_code == 0
-            assert "has been uninstalled" in result.output
+            assert "toolchain have been uninstalled" in result.output
+
+    def test_shows_tip_without_all_flag(self):
+        """Should show --all tip when running without it."""
+        items = [("rag-facile CLI", "/usr/local/bin/rag-facile", True)]
+        with (
+            patch(
+                "cli.commands.uninstall._collect_items_to_remove", return_value=items
+            ),
+        ):
+            result = runner.invoke(main_app, ["uninstall"], input="n\n")
+            assert "--all" in result.output

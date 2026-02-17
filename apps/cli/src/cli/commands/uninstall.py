@@ -47,11 +47,19 @@ def _run_quiet(cmd: list[str]) -> bool:
         return False
 
 
-def _collect_items_to_remove() -> list[tuple[str, str, bool]]:
-    """Collect (label, detail, exists) tuples for everything that will be removed."""
+def _collect_items_to_remove(
+    *,
+    include_tools: bool = False,
+) -> list[tuple[str, str, bool]]:
+    """Collect (label, detail, exists) tuples for everything that will be removed.
+
+    Args:
+        include_tools: If True, also include the toolchain (proto, moon, uv,
+            just, direnv) and shell profile entries.
+    """
     items: list[tuple[str, str, bool]] = []
 
-    # rag-facile CLI
+    # rag-facile CLI (always removed)
     rf_bin = shutil.which("rag-facile")
     items.append(
         (
@@ -60,6 +68,9 @@ def _collect_items_to_remove() -> list[tuple[str, str, bool]]:
             rf_bin is not None,
         )
     )
+
+    if not include_tools:
+        return items
 
     # Proto-managed tools
     for tool in ("moon", "uv", "just"):
@@ -172,15 +183,23 @@ def _clean_windows_path() -> bool:
 
 def run(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    all_tools: bool = typer.Option(
+        False,
+        "--all",
+        help="Also remove the toolchain (proto, moon, uv, just, direnv)",
+    ),
 ) -> None:
-    """Remove RAG Facile and all tools installed by the installer."""
-    items = _collect_items_to_remove()
+    """Remove the RAG Facile CLI.
+
+    By default, only removes the rag-facile CLI itself. Use --all to also
+    remove the entire toolchain installed by the installer (proto, moon,
+    uv, just, direnv, and shell profile entries).
+    """
+    items = _collect_items_to_remove(include_tools=all_tools)
     found_items = [(label, detail, exists) for label, detail, exists in items if exists]
 
     if not found_items:
-        console.print(
-            "[green]Nothing to uninstall — RAG Facile toolchain not found.[/green]"
-        )
+        console.print("[green]Nothing to uninstall — rag-facile not found.[/green]")
         raise typer.Exit()
 
     # Show what will be removed
@@ -189,6 +208,13 @@ def run(
     for label, detail, _ in found_items:
         table.add_row(f"[red]✗[/red]  {label}", f"[dim]{detail}[/dim]")
     console.print(table)
+
+    if not all_tools:
+        console.print(
+            "\n[dim]Tip: use --all to also remove the toolchain "
+            "(proto, moon, uv, just, direnv).[/dim]"
+        )
+
     console.print()
 
     if not yes:
@@ -207,6 +233,12 @@ def run(
             _remove_cli_manually()
     else:
         _remove_cli_manually()
+
+    if not all_tools:
+        console.print(
+            "\n[bold green]RAG Facile CLI has been uninstalled.[/bold green]\n"
+        )
+        raise typer.Exit()
 
     # Step 2: Remove proto-managed tools
     if _tool_exists("proto"):
@@ -255,7 +287,9 @@ def run(
             console.print("  [dim]⊘[/dim] No installer entries found")
 
     # Done
-    console.print("\n[bold green]RAG Facile has been uninstalled.[/bold green]")
+    console.print(
+        "\n[bold green]RAG Facile and its toolchain have been uninstalled.[/bold green]"
+    )
     console.print("[dim]Restart your terminal to apply PATH changes.[/dim]\n")
 
 

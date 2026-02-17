@@ -100,7 +100,9 @@ app.command(
 
 app.command(name="setup", help="Setup a new workspace")(setup.run)
 
-app.command(name="uninstall", help="Remove RAG Facile and its toolchain")(uninstall.run)
+app.command(
+    name="uninstall", help="Remove the RAG Facile CLI (--all for toolchain too)"
+)(uninstall.run)
 
 app.command(name="upgrade", help="Upgrade to the latest version")(upgrade.run)
 

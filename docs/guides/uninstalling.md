@@ -1,22 +1,26 @@
 # Uninstalling RAG Facile
 
-This guide explains how to completely remove RAG Facile and the toolchain installed by the installer.
+This guide explains how to remove RAG Facile and optionally the toolchain installed by the installer.
 
 ## Quick Uninstall
+
+Remove the rag-facile CLI:
 
 ```bash
 rag-facile uninstall
 ```
 
-The command shows what will be removed and asks for confirmation. Use `--yes` to skip the prompt:
+Remove the CLI **and** the entire toolchain (proto, moon, uv, just, direnv):
 
 ```bash
-rag-facile uninstall --yes
+rag-facile uninstall --all
 ```
+
+Both commands show what will be removed and ask for confirmation. Use `--yes` to skip the prompt.
 
 ## What Gets Removed
 
-The uninstall command removes everything the installer put on your machine:
+With `--all`, the uninstall command removes everything the installer put on your machine:
 
 | Component | Location | Description |
 |-----------|----------|-------------|
