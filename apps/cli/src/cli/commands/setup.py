@@ -421,6 +421,13 @@ def render_template_file(template_path: Path, variables: dict[str, str | bool]) 
     return content
 
 
+def _print_no_serve_message(target_display: str) -> None:
+    """Print app location and skip dev server message."""
+    console.print()
+    console.print(f"[dim]Your app is at: {target_display}[/dim]")
+    console.print("[dim]Run the dev server manually when ready.[/dim]")
+
+
 def generate_config_file(
     workspace_root: Path,
     preset: str,
@@ -493,7 +500,6 @@ def generate_standalone(
     env_config: dict[str, str],
     preset: str,
     preset_config: PresetConfig,
-    force: bool,
     no_serve: bool = False,
 ) -> None:
     """Generate a standalone (non-monorepo) project structure."""
@@ -706,9 +712,7 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
 
     # Step 7: Start the dev server (unless --no-serve)
     if no_serve:
-        console.print()
-        console.print(f"[dim]Your app is at: {target_display}[/dim]")
-        console.print("[dim]Run the dev server manually when ready.[/dim]")
+        _print_no_serve_message(target_display)
         return
 
     step_num += 1
@@ -948,7 +952,6 @@ def run(
             env_config=env_config,
             preset=preset,
             preset_config=preset_config,
-            force=force,
             no_serve=no_serve,
         )
         return  # Exit after standalone generation
@@ -1190,9 +1193,7 @@ OPENAI_BASE_URL={env_config["openai_base_url"]}
 
     # Start the dev server (unless --no-serve)
     if no_serve:
-        console.print()
-        console.print(f"[dim]Your app is at: {target_display}[/dim]")
-        console.print("[dim]Run the dev server manually when ready.[/dim]")
+        _print_no_serve_message(target_display)
         return
 
     console.print()
