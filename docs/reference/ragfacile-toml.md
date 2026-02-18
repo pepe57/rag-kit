@@ -121,12 +121,13 @@ collection_naming = "workspace" # "workspace", "app", or "custom"
 distance_metric = "cosine"      # "cosine", "euclidean", "dot-product"
 
 # ==========================================================
-# QUERY ENHANCEMENT
+# QUERY EXPANSION
 # ==========================================================
 [query]
-rewrite_enabled = false         # Rewrite vague queries for clarity
-expand_enabled = false          # Add synonyms and related terms
-spell_check = false             # Fix typos in queries
+strategy = "none"               # "multi_query" | "hyde" | "none" (disabled by default)
+num_variations = 3              # variations to generate, 1–5 (multi_query only)
+model = "openweight-medium"     # LLM model used for expansion
+include_original = true         # always include the original query alongside variants
 
 # ==========================================================
 # RETRIEVAL
@@ -205,8 +206,7 @@ rag-facile config preset apply legal    # Apply a preset
 > **Note**: Albert currently exposes a single embedding model alias (`openweight-embeddings`). Presets keep embeddings consistent while tuning other stages.
 
 | Setting | balanced | fast | accurate | legal | hr |
-|---------|----------|------|----------|-------|----|
-| **Chunking strategy** | semantic | fixed-size | semantic | paragraph | semantic |
+|---------|----------|------|----------|-------|----|\n| **Chunking strategy** | semantic | fixed-size | semantic | paragraph | semantic |
 | **Chunk size** | 512 | 512 | 768 | 768 | 512 |
 | **Embedding model** | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings |
 | **Retrieval strategy** | hybrid | semantic | hybrid | hybrid | hybrid |
@@ -216,7 +216,7 @@ rag-facile config preset apply legal    # Apply a preset
 | **Temperature** | 0.7 | 0.3 | 0.5 | 0.3 | 0.5 |
 | **Hallucination detection** | off | off | **on** | **on** | **on** |
 | **Hallucination fallback** | warn | warn | warn | **reject** | warn |
-| **Query enhancement** | off | off | **on** | off | **on** |
+| **Query expansion** | none | none | **multi_query** | none | **multi_query** |
 
 ### When to Use Each Preset
 

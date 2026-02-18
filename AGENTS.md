@@ -258,6 +258,20 @@ When adding a new app/package:
 
 ## 6. Recent Work & Features (Feb 2026)
 
+### Query Expansion System (✅ Completed Feb 18, 2026)
+
+- **Problem**: Vocabulary mismatch — users write colloquial queries ("APL", "CNI") that don't match the formal French of indexed documents.
+- **Package**: `packages/query/` → `rag_facile.query` namespace
+- **Architecture**: Strategy Pattern (`QueryExpander` ABC, `get_expander(client, config)` factory)
+- **Strategies**:
+  - `multi_query`: generates 3–5 formal French administrative query variants via LLM (instructor + Pydantic structured output); results merged with Reciprocal Rank Fusion (RRF)
+  - `hyde`: generates a hypothetical ideal administrative document to embed instead of the raw query
+- **Key design**: `AlbertClient.as_instructor()` added to both sync/async clients — single choke point for structured LLM output, reusable by any package
+- **Aggregation**: `fuse_results()` in `packages/retrieval/` implements RRF (k=60), de-duplicating chunks by `(chunk_id, collection_id)` and boosting chunks confirmed by multiple query angles
+- **Integration**: `AlbertPipeline.process_query()` Step 0; default `strategy = "none"` → zero impact for existing deployments
+- **Preset activation**: `accurate` and `hr` presets set `strategy = "multi_query"`; `legal` keeps `strategy = "none"` to preserve exact terminology
+- **Config**: `[query] strategy = "multi_query"` in `ragfacile.toml`
+
 ### Issue #46: Proxy Support (✅ Completed Feb 6, 2026)
 - **Problem**: Proto plugin installation fails on networks with proxies/VPNs
 - **Root Cause**: Proto's reqwest doesn't auto-detect HTTP_PROXY env vars
