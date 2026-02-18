@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING, Any
@@ -213,8 +214,9 @@ class AlbertPipeline(RAGPipeline):
                 1,
                 len(queries),
             )
-            all_results = [
-                search_chunks(
+
+            def _search(q: str) -> list:
+                return search_chunks(
                     client,
                     q,
                     collection_ids,
@@ -222,8 +224,9 @@ class AlbertPipeline(RAGPipeline):
                     method=config.retrieval.strategy,
                     score_threshold=config.retrieval.score_threshold,
                 )
-                for q in queries
-            ]
+
+            with ThreadPoolExecutor() as executor:
+                all_results = list(executor.map(_search, queries))
             chunks = fuse_results(all_results, limit=config.retrieval.top_k)
         else:
             # Step 1: Single search (default path — no expansion overhead)
