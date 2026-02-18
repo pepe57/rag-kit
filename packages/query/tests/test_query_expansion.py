@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import openai
 import pytest
 
 from rag_facile.query._models import ExpandedQueries, HypotheticalDocument
@@ -86,7 +87,9 @@ class TestMultiQueryExpander:
     def test_expand_falls_back_on_llm_error(self):
         client = MagicMock()
         instructor_mock = MagicMock()
-        instructor_mock.chat.completions.create.side_effect = RuntimeError("API error")
+        instructor_mock.chat.completions.create.side_effect = openai.APIConnectionError(
+            request=MagicMock()
+        )
         client.as_instructor.return_value = instructor_mock
 
         expander = MultiQueryExpander(client, _make_config())
@@ -156,7 +159,9 @@ class TestHyDEExpander:
     def test_expand_falls_back_on_llm_error(self):
         client = MagicMock()
         instructor_mock = MagicMock()
-        instructor_mock.chat.completions.create.side_effect = RuntimeError("API error")
+        instructor_mock.chat.completions.create.side_effect = openai.APIConnectionError(
+            request=MagicMock()
+        )
         client.as_instructor.return_value = instructor_mock
 
         expander = HyDEExpander(client, _make_config(strategy="hyde"))

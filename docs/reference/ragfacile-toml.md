@@ -206,7 +206,8 @@ rag-facile config preset apply legal    # Apply a preset
 > **Note**: Albert currently exposes a single embedding model alias (`openweight-embeddings`). Presets keep embeddings consistent while tuning other stages.
 
 | Setting | balanced | fast | accurate | legal | hr |
-|---------|----------|------|----------|-------|----|\n| **Chunking strategy** | semantic | fixed-size | semantic | paragraph | semantic |
+|---------|----------|------|----------|-------|----|
+| **Chunking strategy** | semantic | fixed-size | semantic | paragraph | semantic |
 | **Chunk size** | 512 | 512 | 768 | 768 | 512 |
 | **Embedding model** | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings | openweight-embeddings |
 | **Retrieval strategy** | hybrid | semantic | hybrid | hybrid | hybrid |

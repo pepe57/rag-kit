@@ -16,6 +16,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+import openai
+from instructor.core import InstructorRetryException
+
 from rag_facile.query._base import QueryExpander
 from rag_facile.query._models import ExpandedQueries
 
@@ -99,7 +102,7 @@ class MultiQueryExpander(QueryExpander):
                 ],
                 max_retries=2,
             )
-        except Exception as exc:  # noqa: BLE001
+        except (openai.APIError, InstructorRetryException) as exc:
             # Graceful degradation: fall back to the original query
             # so retrieval still works even if expansion fails.
             logger.warning(
