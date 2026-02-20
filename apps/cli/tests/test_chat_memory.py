@@ -207,16 +207,29 @@ class TestGitCommitSession:
 
     def test_skips_commit_when_nothing_staged(self, workspace):
         """If git diff --cached is clean, no commit is made."""
+        check_ignore = MagicMock(returncode=1)  # 1 = not ignored
         add_result = MagicMock(returncode=0)
         diff_result = MagicMock(returncode=0)  # 0 = nothing staged
 
         with patch(
             "cli.commands.chat.memory.subprocess.run",
-            side_effect=[add_result, diff_result],
+            side_effect=[check_ignore, add_result, diff_result],
         ) as mock_run:
             git_commit_session(workspace)
 
-        assert mock_run.call_count == 2  # add + diff, no commit
+        assert mock_run.call_count == 3  # check-ignore + add + diff, no commit
+
+    def test_skips_silently_when_gitignored(self, workspace):
+        """If .rag-facile/ is gitignored (e.g. source repo), skip without warning."""
+        check_ignore = MagicMock(returncode=0)  # 0 = ignored
+
+        with patch(
+            "cli.commands.chat.memory.subprocess.run",
+            return_value=check_ignore,
+        ) as mock_run:
+            git_commit_session(workspace)
+
+        assert mock_run.call_count == 1  # only check-ignore, nothing else
 
 
 import openai  # noqa: E402 — needed for APIConnectionError in test above

@@ -183,22 +183,33 @@ def update_memory(workspace: Path, session_log: str) -> None:
 def git_commit_session(workspace: Path) -> None:
     """Stage and commit .rag-facile/ changes with a session commit message.
 
-    Best-effort: silent when git is absent, warns on unexpected failure.
+    Best-effort: silent when git is absent or .rag-facile/ is gitignored
+    (expected when running from the source repo during development).
     """
     today = date.today().isoformat()
     try:
+        # Skip silently if .rag-facile/ is ignored by the workspace .gitignore
+        # (exit code 0 = ignored, 1 = not ignored, 128 = not a git repo)
+        check = subprocess.run(
+            ["git", "check-ignore", "-q", ".rag-facile/"],
+            cwd=workspace,
+            capture_output=True,
+        )
+        if check.returncode == 0:
+            return  # gitignored — skip (dev / source-repo scenario)
+
         subprocess.run(
             ["git", "add", ".rag-facile/"],
             cwd=workspace,
             check=True,
             capture_output=True,
         )
-        result = subprocess.run(
+        diff = subprocess.run(
             ["git", "diff", "--cached", "--quiet"],
             cwd=workspace,
             capture_output=True,
         )
-        if result.returncode == 0:
+        if diff.returncode == 0:
             return  # nothing staged — skip commit
 
         subprocess.run(
