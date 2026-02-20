@@ -1,7 +1,7 @@
 ---
 name: rag-cli
 description: Run any rag-facile CLI command on behalf of the user. Use when the user wants to list collections, inspect config, generate an evaluation dataset, or run any other rag-facile operation.
-triggers: ["collections", "generate-dataset", "dataset", "config show", "version", "liste des commandes"]
+triggers: ["collections", "generate-dataset", "dataset", "version", "commandes"]
 ---
 
 # Skill: rag-cli
@@ -25,7 +25,7 @@ show the user the real output.
 
 | Command | What it does |
 |---|---|
-| `generate-dataset ./docs -o out.jsonl -n 20 --provider albert` | Generate synthetic Q&A evaluation dataset |
+| `generate-dataset ./docs -o golden_dataset.jsonl -n 20 --provider albert` | Generate synthetic Q&A evaluation dataset |
 
 ## How to use run_rag_facile
 
@@ -50,7 +50,7 @@ Examples:
 
 1. Ask the user for the docs directory path
 2. Suggest `golden_dataset.jsonl` as the output file
-3. Recommend 20 questions for a first run (~2 minutes)
+3. Recommend 20 questions for a first run (duration depends on document size and API latency)
 4. Confirm: "Je vais lancer : rag-facile generate-dataset <path> -o <file> -n <n> --provider albert. Cela prendra environ X minutes. Puis-je démarrer ?"
 5. On yes: call `run_rag_facile("generate-dataset <path> -o <file> -n <n> --provider albert")`
 6. Explain next steps: use `rag-facile eval --dataset <file>` to measure pipeline quality
@@ -59,9 +59,10 @@ Examples:
 
 1. Call `run_rag_facile("collections list")` to show available collections
 2. Explain public vs private collections
-3. To enable a collection, read current list from `get_ragfacile_config()`
-4. Compute new list and call `update_config("storage.collections", "[id1, id2, ...]")`
-   with confirmation (never use run_rag_facile for this — use update_config)
+3. Call `get_ragfacile_config()` to read the current `storage.collections` list
+4. Compute the new list by adding or removing the requested ID(s)
+5. Call `update_config("storage.collections", "[id1, id2, ...]")` with the full new list
+   and confirmation (never use run_rag_facile for config writes — use update_config)
 
 ## Rules
 

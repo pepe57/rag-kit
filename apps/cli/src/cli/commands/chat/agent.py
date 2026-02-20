@@ -84,9 +84,7 @@ If the user BOTH reports a problem AND asks to change a value, prefer tune-pipel
 or wants to navigate a specific package or file. \
 DO NOT use for conceptual questions about how RAG works — use explain-rag for that.
 
-- rag-cli          → user wants to run a CLI operation: list collections, generate an \
-evaluation dataset, inspect config output, or any other rag-facile command. \
-Use run_rag_facile() for read operations; use update_config() for config writes.
+- rag-cli          → user wants to run a CLI operation: list collections, generate an evaluation dataset, inspect config output, or any other rag-facile command. Use run_rag_facile() for read operations; use update_config() for config writes.
 
 - skill-creator    → user explicitly wants to CREATE a new custom skill file. \
 Requires the user to have stated a skill topic or purpose. \
