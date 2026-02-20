@@ -17,6 +17,7 @@ from smolagents import OpenAIServerModel, ToolCallingAgent
 from smolagents.monitoring import LogLevel
 from smolagents.utils import AgentError, AgentMaxStepsError
 
+from cli.commands.chat.init import needs_init, run_init_wizard
 from cli.commands.chat.tools import get_ragfacile_config, set_workspace_root
 
 
@@ -77,6 +78,9 @@ def start_chat() -> None:
     if workspace:
         load_dotenv(workspace / ".env")  # load API key + config from project .env
         set_workspace_root(workspace)
+        # First-run: initialise .rag-facile/ if absent
+        if needs_init(workspace):
+            run_init_wizard(workspace)
     else:
         no_workspace_hint = (
             "\n[dim]💡 No ragfacile.toml found — run [bold]rag-facile setup[/bold] "
