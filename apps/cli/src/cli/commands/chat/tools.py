@@ -301,7 +301,7 @@ def update_config(key: str, value: str) -> str:
             check=True,
         )
         committed = True
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         committed = False
 
     commit_note = " et committé dans git." if committed else "."

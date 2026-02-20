@@ -79,7 +79,7 @@ _UI: dict[str, dict[str, str]] = {
         "you": "Vous",
         "goodbye": "À bientôt\u00a0!",
         "interrupted": "Interrompu.",
-        "api_error_hint": "Vérifiez vos variables OPENAI_API_KEY et OPENAI_BASE_URL.",
+        "api_error_hint": "Vérifiez vos variables OPENAI_API_KEY, OPENAI_BASE_URL et RAG_ASSISTANT_MODEL.",
         "too_many_steps": (
             "J'ai eu besoin de trop d'étapes pour répondre. "
             "Pouvez-vous reformuler ou poser une question plus simple\u00a0?"
@@ -104,7 +104,7 @@ _UI: dict[str, dict[str, str]] = {
         "you": "You",
         "goodbye": "À bientôt!",
         "interrupted": "Interrupted.",
-        "api_error_hint": "Check your OPENAI_API_KEY and OPENAI_BASE_URL.",
+        "api_error_hint": "Check your OPENAI_API_KEY, OPENAI_BASE_URL and RAG_ASSISTANT_MODEL.",
         "too_many_steps": (
             "I needed too many steps to answer that. "
             "Could you rephrase or break it into smaller questions?"
@@ -169,8 +169,10 @@ def _build_model() -> OpenAIServerModel:
     api_base = os.environ.get("OPENAI_BASE_URL", "https://albert.api.etalab.gouv.fr/v1")
     # Use Albert model aliases (resolved server-side) rather than raw model IDs.
     # openweight-large = the largest available generation model (best quality).
-    # Override with OPENAI_MODEL in .env for a different size or provider.
-    model_id = os.environ.get("OPENAI_MODEL", "openweight-large")
+    # Intentionally separate from OPENAI_MODEL (RAG pipeline) — the assistant
+    # and the RAG pipeline are different use cases with different quality needs.
+    # Override with RAG_ASSISTANT_MODEL in .env for a lighter/faster model.
+    model_id = os.environ.get("RAG_ASSISTANT_MODEL", "openweight-large")
 
     if not api_key:
         console.print(

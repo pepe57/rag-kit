@@ -177,6 +177,19 @@ class TestUpdateConfig:
         result = self._run("retrieval..top_k", "20")
         assert "Invalid config key" in result
 
+    def test_skips_commit_silently_on_file_not_found(self, workspace):
+        with (
+            patch("cli.commands.chat.tools.console.input", return_value="o"),
+            patch("cli.commands.chat.tools.console.print"),
+            patch(
+                "cli.commands.chat.tools.subprocess.run",
+                side_effect=FileNotFoundError,
+            ),
+        ):
+            result = update_config("retrieval.top_k", "20")
+        assert "✓" in result
+        assert "committé" not in result
+
     def test_handles_keyboard_interrupt_on_prompt(self, workspace):
         with (
             patch(
