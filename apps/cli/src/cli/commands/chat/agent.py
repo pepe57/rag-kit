@@ -122,6 +122,37 @@ _UI: dict[str, dict[str, str]] = {
 _RATE_LIMIT_WAIT = 15
 
 
+_TOOL_ICONS: dict[str, str] = {
+    "get_ragfacile_config": "⚙️",
+    "get_agents_md": "📋",
+    "get_recent_git_activity": "📜",
+    "get_docs": "📖",
+}
+
+
+def _with_notification(tool):  # type: ignore[no-untyped-def]
+    """Wrap a smolagents tool's forward() to print a dim notification before calling.
+
+    Shown unconditionally (not gated behind --debug) so users always see
+    what the agent is doing, without needing the full smolagents trace.
+    Guards against double-wrapping so repeated start_chat() calls are safe.
+    """
+    if getattr(tool, "_notification_wrapped", False):
+        return tool
+
+    _original = tool.forward
+    icon = _TOOL_ICONS.get(tool.name, "🔧")
+    name = tool.name
+
+    def _notifying(*args: object, **kwargs: object) -> object:
+        console.print(f"[dim]{icon} {name}[/dim]")
+        return _original(*args, **kwargs)
+
+    tool.forward = _notifying
+    tool._notification_wrapped = True
+    return tool
+
+
 def _detect_workspace() -> Path | None:
     """Walk up from cwd looking for a ragfacile.toml to identify the workspace root."""
     cwd = Path.cwd()
@@ -185,8 +216,18 @@ def start_chat(debug: bool = False) -> None:
     # Build model + agent — typer.Exit propagates naturally on missing API key
     model = _build_model()
 
+    tools = [
+        _with_notification(t)
+        for t in [
+            get_ragfacile_config,
+            get_agents_md,
+            get_recent_git_activity,
+            get_docs,
+        ]
+    ]
+
     agent = ToolCallingAgent(
-        tools=[get_ragfacile_config, get_agents_md, get_recent_git_activity, get_docs],
+        tools=tools,
         model=model,
         instructions=_SYSTEM_PROMPT,
         verbosity_level=LogLevel.INFO if debug else LogLevel.OFF,
@@ -225,6 +266,9 @@ def start_chat(debug: bool = False) -> None:
             break
 
         # ── /skills slash commands ────────────────────────────────────────────
+        _skill_bootstrap = (
+            False  # set True when explicit load should run agent immediately
+        )
         if user_input.startswith("/skills"):
             parts = user_input.split(None, 2)  # ["/skills", cmd?, arg?]
             sub = parts[1].lower() if len(parts) > 1 else ""
@@ -258,16 +302,25 @@ def start_chat(debug: bool = False) -> None:
                 console.print(f"[dim]{ui['skill_cleared']}[/dim]")
 
             elif sub in available_skills:
-                # /skills <name> — explicit load
+                # /skills <name> — explicit load: activate and bootstrap the flow
                 active_skill = sub
                 active_skill_content = load_skill(available_skills[sub])
-                skill_injected = False
                 console.print(f"[dim]{ui['skill_loaded'].format(name=sub)}[/dim]")
+                # Inject skill + trigger word so the agent starts its flow immediately
+                user_input = (
+                    f"[Compétence chargée: {sub}]\n{active_skill_content}\n\n---\n\n"
+                    "Commence."
+                )
+                skill_injected = True
+                _skill_bootstrap = (
+                    True  # skip the outer continue — fall through to agent
+                )
 
             else:
                 console.print(f"[dim]{ui['skill_not_found'].format(name=sub)}[/dim]")
 
-            continue
+            if not _skill_bootstrap:
+                continue
 
         # ── Auto-detect skill from message (only if none active) ─────────────
         if active_skill is None:
