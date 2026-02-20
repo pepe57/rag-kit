@@ -51,7 +51,7 @@ _LANGUAGE_CHOICES = [
 # ── Template generators ───────────────────────────────────────────────────────
 
 
-def _memory_template(project_name: str, preset: str) -> str:
+def _memory_template(project_name: str, preset: str, experience: str) -> str:
     today = date.today().isoformat()
     return f"""\
 ---
@@ -63,7 +63,7 @@ preset: {preset}
 # Project Memory
 
 ## User Profile
-- Experience level: (set during init)
+- Experience level: {experience}
 - Goals: (not yet defined — ask the user)
 - Completed topics: (none yet)
 
@@ -113,12 +113,14 @@ def _read_preset(workspace: Path) -> str:
         with open(config_file, "rb") as f:
             data = tomllib.load(f)
         return data.get("meta", {}).get("preset", "balanced")
-    except (OSError, KeyError):
+    except tomllib.TOMLDecodeError:
+        return "balanced"
+    except OSError:
         return "balanced"
 
 
 def _git_add(workspace: Path) -> None:
-    """Stage .rag-facile/ in the workspace git repo (best-effort, silent on failure)."""
+    """Stage .rag-facile/ in the workspace git repo (best-effort)."""
     try:
         subprocess.run(
             ["git", "add", ".rag-facile/"],
@@ -126,8 +128,12 @@ def _git_add(workspace: Path) -> None:
             check=True,
             capture_output=True,
         )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        pass  # not a git repo or git not installed — silently skip
+    except FileNotFoundError:
+        pass  # git not installed — silently skip
+    except subprocess.CalledProcessError as exc:
+        console.print(
+            f"[dim yellow]⚠ git add .rag-facile/ failed: {exc.stderr.decode().strip()}[/dim yellow]"
+        )
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -191,8 +197,8 @@ def run_init_wizard(workspace: Path) -> str:
             ).ask()
             if result is not None:
                 experience = result
-    except Exception:  # noqa: BLE001 — non-interactive / unexpected env
-        pass  # keep defaults set above
+    except (EOFError, OSError):
+        pass  # non-interactive terminal (pipe, CI) — keep defaults
 
     # ── Create directory structure ────────────────────────────────────────────
     agent_dir = workspace / _AGENT_DIR
@@ -202,13 +208,10 @@ def run_init_wizard(workspace: Path) -> str:
     project_name = workspace.name
     preset = _read_preset(workspace)
 
-    # Write MEMORY.md (with experience level injected)
-    memory_content = _memory_template(project_name, preset)
-    memory_content = memory_content.replace(
-        "- Experience level: (set during init)",
-        f"- Experience level: {experience}",
+    # Write MEMORY.md
+    (workspace / _MEMORY_FILE).write_text(
+        _memory_template(project_name, preset, experience), encoding="utf-8"
     )
-    (workspace / _MEMORY_FILE).write_text(memory_content, encoding="utf-8")
 
     # Write profile.md
     (workspace / _PROFILE_FILE).write_text(

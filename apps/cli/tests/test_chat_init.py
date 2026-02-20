@@ -141,11 +141,11 @@ class TestRunInitWizard:
         assert "expert" in memory
 
     def test_falls_back_to_defaults_on_non_interactive(self, tmp_path):
-        """If questionary raises (non-interactive env), defaults are used."""
+        """If questionary raises EOFError (non-interactive env), defaults are used."""
         with (
             patch(
                 "cli.commands.chat.init.questionary.select",
-                side_effect=Exception("non-interactive"),
+                side_effect=EOFError("non-interactive terminal"),
             ),
             patch("cli.commands.chat.init._git_add"),
         ):
