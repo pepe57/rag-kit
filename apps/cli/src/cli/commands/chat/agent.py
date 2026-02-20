@@ -146,13 +146,10 @@ def start_chat() -> None:
 
     ui = _UI.get(language, _UI["fr"])
 
-    # Load persistent memory into agent instructions
+    # Load persistent memory — injected into the first user turn (not system prompt)
+    # so the model pays full attention to it rather than losing it at the end of
+    # smolagents' long built-in system prompt.
     memory_context = load_context(workspace) if workspace else ""
-    instructions = (
-        f"{_SYSTEM_PROMPT}\n\n# Contexte mémorisé\n\n{memory_context}"
-        if memory_context
-        else _SYSTEM_PROMPT
-    )
 
     # Increment session count (best-effort — workspace may be None)
     if workspace:
@@ -164,7 +161,7 @@ def start_chat() -> None:
     agent = ToolCallingAgent(
         tools=[get_ragfacile_config],
         model=model,
-        instructions=instructions,
+        instructions=_SYSTEM_PROMPT,
         verbosity_level=LogLevel.OFF,  # -1: suppress all smolagents output incl. errors
         max_steps=5,
     )
@@ -200,13 +197,23 @@ def start_chat() -> None:
             console.print(f"[dim]{ui['goodbye']}[/dim]")
             break
 
+        # On the first turn: prepend memory context so the model sees it
+        # right before the question (much better attention than end-of-system-prompt)
+        if memory_context and not session_turns:
+            effective_input = (
+                f"[Mémoire des sessions précédentes]\n{memory_context}\n\n---\n\n"
+                f"{user_input}"
+            )
+        else:
+            effective_input = user_input
+
         # Retry loop — keeps retrying on 429 until success or Ctrl+C
         response = None
         while True:
             _rate_limited = False
             with console.status(f"[dim]{ui['thinking']}[/dim]", spinner="dots"):
                 try:
-                    response = agent.run(user_input, reset=False)
+                    response = agent.run(effective_input, reset=False)
                 except KeyboardInterrupt:
                     console.print(f"\n[yellow]{ui['interrupted']}[/yellow]")
                 except openai.APIError as exc:
