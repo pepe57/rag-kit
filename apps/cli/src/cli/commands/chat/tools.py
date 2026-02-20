@@ -49,11 +49,20 @@ _DOCS_INDEX: dict[str, str] = {
 # Module-level workspace reference — set by the agent harness at session start.
 _workspace_root: Path | None = None
 
+# Available skills — populated at session start by the agent harness.
+_available_skills: dict = {}
+
 
 def set_workspace_root(root: Path | None) -> None:
     """Register the workspace root so tools can locate project files."""
     global _workspace_root
     _workspace_root = root
+
+
+def set_available_skills(skills: dict) -> None:
+    """Register available skills so activate_skill can resolve names."""
+    global _available_skills
+    _available_skills = skills
 
 
 @tool
@@ -184,6 +193,37 @@ def get_docs(topic: str) -> str:
         return f"Documentation file '{matched_path}' is missing from this installation."
 
     return doc_file.read_text(encoding="utf-8")
+
+
+# ── Skill activation ───────────────────────────────────────────────────────────
+
+
+@tool
+def activate_skill(name: str) -> str:
+    """Load a skill to guide your behaviour for this session.
+
+    Call this as your FIRST action whenever you recognise the user's intent as
+    matching one of the available skills. Returns the skill's full instructions —
+    read them carefully and follow them for the rest of the session.
+
+    Available skills and when to use them:
+    - explain-rag      → user asks what something IS (concept, definition, how it works)
+    - learn-retrieval  → user reports a PROBLEM (bad results, not finding docs, irrelevant)
+    - tune-pipeline    → user wants to CHANGE or SET a parameter (top_k, top_n, preset…)
+    - explore-codebase → user asks WHERE something is in the code or how it is implemented
+    - skill-creator    → user wants to CREATE a new custom skill
+
+    Args:
+        name: Skill name, e.g. 'tune-pipeline'.
+    """
+    from cli.commands.chat.skills import load_skill
+
+    if not _available_skills:
+        return "No skills available in this session."
+    if name not in _available_skills:
+        available = ", ".join(sorted(_available_skills.keys()))
+        return f"Skill '{name}' not found. Available: {available}"
+    return load_skill(_available_skills[name])
 
 
 # ── Config editing ────────────────────────────────────────────────────────────

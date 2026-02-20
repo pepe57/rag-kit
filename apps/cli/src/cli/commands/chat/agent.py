@@ -21,7 +21,6 @@ from cli.commands.chat._console import console
 
 from cli.commands.chat.init import needs_init, read_language, run_init_wizard
 from cli.commands.chat.skills import (
-    auto_detect_skill,
     discover_skills,
     format_skills_list,
     install_skill,
@@ -35,10 +34,12 @@ from cli.commands.chat.memory import (
     update_memory,
 )
 from cli.commands.chat.tools import (
+    activate_skill,
     get_agents_md,
     get_docs,
     get_ragfacile_config,
     get_recent_git_activity,
+    set_available_skills,
     set_workspace_root,
     update_config,
 )
@@ -59,6 +60,19 @@ You can:
 
 Always be encouraging and educational. When you suggest a change, explain the tradeoff \
 in terms of speed vs. quality vs. cost so the user can make an informed decision.
+
+## Skill activation
+
+Before responding to any message, decide whether one of these skills applies \
+and call activate_skill(name) as your FIRST action if so:
+
+- explain-rag       → user asks what something IS (concept, definition, "comment ça marche")
+- learn-retrieval   → user reports a PROBLEM with results (bad, irrelevant, missing, "ne trouve pas")
+- tune-pipeline     → user wants to CHANGE or SET a parameter (top_k, top_n, chunk_size, preset…)
+- explore-codebase  → user asks WHERE something is in the code or how it is implemented
+- skill-creator     → user wants to CREATE a new custom skill
+
+Only activate ONE skill per session. If no skill clearly applies, respond directly.
 
 ## STRICT RULE — Configuration changes (update_config)
 
@@ -143,6 +157,7 @@ _RATE_LIMIT_WAIT = 15
 
 
 _TOOL_ICONS: dict[str, str] = {
+    "activate_skill": "📚",
     "get_ragfacile_config": "⚙️",
     "get_agents_md": "📋",
     "get_recent_git_activity": "📜",
@@ -235,12 +250,37 @@ def start_chat(debug: bool = False) -> None:
 
     # Discover skills: built-in + workspace (.agents/skills/)
     available_skills = discover_skills(workspace)
+    set_available_skills(available_skills)  # expose to activate_skill tool
     active_skill: str | None = None  # name of currently loaded skill
     active_skill_content: str | None = None  # SKILL.md content to inject
     skill_injected = False  # True once content has been sent to agent
 
     # Build model + agent — typer.Exit propagates naturally on missing API key
     model = _build_model()
+
+    # Side-effect hook: when the agent calls activate_skill(), persist the returned
+    # content so it's injected into subsequent turns (same as explicit /skills load).
+    def _on_skill_activated(skill_name: str, content: str) -> None:
+        nonlocal active_skill, active_skill_content, skill_injected
+        active_skill = skill_name
+        active_skill_content = content
+        skill_injected = True  # content already in agent context this turn
+        console.print(f"[dim]{ui['skill_loaded'].format(name=skill_name)}[/dim]")
+
+    def _wrap_activate_skill(tool_obj):  # type: ignore[no-untyped-def]
+        """Extend _with_notification to also persist skill state."""
+        _original_forward = tool_obj.forward
+
+        def _forward(name: str, **kwargs: object) -> object:
+            result = _original_forward(name, **kwargs)
+            if isinstance(result, str) and not result.startswith("Skill '"):
+                # Successful activation — result IS the skill content
+                _on_skill_activated(name, result)
+            return result
+
+        tool_obj.forward = _forward
+        tool_obj._notification_wrapped = True  # prevent double-wrap
+        return tool_obj
 
     tools = [
         _with_notification(t)
@@ -251,7 +291,7 @@ def start_chat(debug: bool = False) -> None:
             get_docs,
             update_config,
         ]
-    ]
+    ] + [_wrap_activate_skill(activate_skill)]
 
     agent = ToolCallingAgent(
         tools=tools,
@@ -349,14 +389,8 @@ def start_chat(debug: bool = False) -> None:
             if not _skill_bootstrap:
                 continue
 
-        # ── Auto-detect skill from message (only if none active) ─────────────
-        if active_skill is None:
-            detected = auto_detect_skill(user_input, available_skills)
-            if detected:
-                active_skill = detected
-                active_skill_content = load_skill(available_skills[detected])
-                skill_injected = False
-                console.print(f"[dim]{ui['skill_loaded'].format(name=detected)}[/dim]")
+        # Skill activation is handled by the agent itself via the activate_skill tool.
+        # No keyword auto-detection here — the LLM picks the right skill semantically.
 
         # Build effective_input — layer memory (first turn) + skill (on load) + message
         effective_input = user_input
