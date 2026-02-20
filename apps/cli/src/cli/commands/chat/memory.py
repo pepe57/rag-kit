@@ -128,14 +128,13 @@ def update_memory(workspace: Path, session_log: str) -> None:
 
     try:
         client = openai.OpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("ALBERT_API_KEY", ""),
-            base_url=os.environ.get(
+            api_key=os.getenv("OPENAI_API_KEY") or os.getenv("ALBERT_API_KEY", ""),
+            base_url=os.getenv(
                 "OPENAI_BASE_URL", "https://albert.api.etalab.gouv.fr/v1"
             ),
         )
         response = client.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL", "meta-llama/Llama-3.1-70B-Instruct"),
+            model=os.getenv("OPENAI_MODEL", "meta-llama/Llama-3.1-70B-Instruct"),
             messages=[
                 {"role": "system", "content": _UPDATE_SYSTEM},
                 {
@@ -168,11 +167,10 @@ def update_memory(workspace: Path, session_log: str) -> None:
         flags=re.MULTILINE,
     )
 
-    # Append new facts under "## Learned Facts"
-    if "## Learned Facts" in updated:
-        updated = updated.rstrip() + f"\n{new_facts}\n"
-    else:
-        updated = updated.rstrip() + f"\n\n## Learned Facts\n{new_facts}\n"
+    # Ensure "## Learned Facts" section exists, then append
+    if "## Learned Facts" not in updated:
+        updated = updated.rstrip() + "\n\n## Learned Facts\n"
+    updated = updated.rstrip() + f"\n{new_facts}\n"
 
     memory_file.write_text(updated, encoding="utf-8")
 

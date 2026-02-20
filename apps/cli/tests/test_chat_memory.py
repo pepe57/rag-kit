@@ -3,6 +3,7 @@
 import subprocess
 from unittest.mock import MagicMock, patch
 
+import openai
 import pytest
 
 from cli.commands.chat.memory import (
@@ -230,6 +231,3 @@ class TestGitCommitSession:
             git_commit_session(workspace)
 
         assert mock_run.call_count == 1  # only check-ignore, nothing else
-
-
-import openai  # noqa: E402 — needed for APIConnectionError in test above
