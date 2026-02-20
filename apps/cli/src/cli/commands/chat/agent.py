@@ -269,7 +269,7 @@ def start_chat(debug: bool = False) -> None:
         _skill_bootstrap = (
             False  # set True when explicit load should run agent immediately
         )
-        if user_input.startswith("/skills"):
+        if user_input == "/skills" or user_input.startswith("/skills "):
             parts = user_input.split(None, 2)  # ["/skills", cmd?, arg?]
             sub = parts[1].lower() if len(parts) > 1 else ""
             arg = parts[2] if len(parts) > 2 else ""

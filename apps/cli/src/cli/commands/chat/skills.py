@@ -13,9 +13,10 @@ prompt. Only one skill is active at a time per session.
 
 from __future__ import annotations
 
-import re
 import subprocess
 from pathlib import Path
+
+import yaml
 
 # ── Keyword triggers for auto-detection ──────────────────────────────────────
 
@@ -78,18 +79,15 @@ _SKILL_KEYWORDS: dict[str, list[str]] = {
 
 
 def _builtin_skills_dir() -> Path | None:
-    """Return the bundled skills directory (installed package or dev repo)."""
-    # Installed: cli/skills/ sits two levels above this file (cli/commands/chat/)
-    bundled = Path(__file__).resolve().parents[2] / "skills"
-    if bundled.exists():
-        return bundled
-    # Development: skills live at apps/cli/src/cli/skills/
-    repo_skills = (
-        Path(__file__).resolve().parents[6] / "apps" / "cli" / "src" / "cli" / "skills"
-    )
-    if repo_skills.exists():
-        return repo_skills
-    return None
+    """Return the bundled skills directory (installed package or dev repo).
+
+    In both cases the path is the same relative to this file:
+      <installed>  site-packages/cli/skills/
+      <dev>        apps/cli/src/cli/skills/
+    Both resolve to parents[2] / "skills" from cli/commands/chat/skills.py.
+    """
+    candidate = Path(__file__).resolve().parents[2] / "skills"
+    return candidate if candidate.exists() else None
 
 
 _WORKSPACE_SKILLS_DIR = ".agents/skills"  # standard npx skills location
@@ -167,14 +165,33 @@ def format_skills_list(skills: dict[str, Path]) -> str:
     return "\n".join(lines)
 
 
-def _extract_description(skill_path: Path) -> str:
-    """Pull the description from SKILL.md YAML frontmatter."""
+_frontmatter_cache: dict[Path, dict] = {}
+
+
+def _parse_frontmatter(skill_path: Path) -> dict:
+    """Parse and cache YAML frontmatter from a SKILL.md file.
+
+    Parses once per path; result is cached for the session to avoid
+    re-reading files on every discover/detect call.
+    """
+    if skill_path in _frontmatter_cache:
+        return _frontmatter_cache[skill_path]
+    result: dict = {}
     try:
         content = skill_path.read_text(encoding="utf-8")
-        match = re.search(r"^description:\s*(.+)$", content, re.MULTILINE)
-        return match.group(1).strip() if match else ""
-    except OSError:
-        return ""
+        if content.startswith("---"):
+            end = content.find("---", 3)
+            if end != -1:
+                result = yaml.safe_load(content[3:end]) or {}
+    except (OSError, yaml.YAMLError):
+        pass
+    _frontmatter_cache[skill_path] = result
+    return result
+
+
+def _extract_description(skill_path: Path) -> str:
+    """Pull the description from SKILL.md YAML frontmatter."""
+    return str(_parse_frontmatter(skill_path).get("description", ""))
 
 
 # ── Auto-detection ────────────────────────────────────────────────────────────
@@ -210,15 +227,8 @@ def auto_detect_skill(
 
 def _extract_triggers(skill_path: Path) -> list[str]:
     """Pull the triggers list from SKILL.md YAML frontmatter."""
-    try:
-        content = skill_path.read_text(encoding="utf-8")
-        match = re.search(r"^triggers:\s*\[(.+?)\]", content, re.MULTILINE | re.DOTALL)
-        if not match:
-            return []
-        raw = match.group(1)
-        return [t.strip().strip('"').strip("'") for t in raw.split(",")]
-    except OSError:
-        return []
+    raw = _parse_frontmatter(skill_path).get("triggers", [])
+    return [str(t) for t in raw] if isinstance(raw, list) else []
 
 
 # ── npx skills integration ────────────────────────────────────────────────────
@@ -229,6 +239,8 @@ def install_skill(package: str, workspace: Path) -> str:
 
     Returns a human-readable result message.
     """
+    if not package or package.startswith("-"):
+        return "Invalid package name."
     try:
         result = subprocess.run(
             ["npx", "skills", "add", package, "--yes"],

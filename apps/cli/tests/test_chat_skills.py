@@ -212,3 +212,11 @@ class TestInstallSkill:
         ):
             result = install_skill("org/pkg", workspace)
         assert "timed out" in result.lower()
+
+    def test_rejects_flag_like_package_name(self, workspace):
+        result = install_skill("--evil-flag", workspace)
+        assert result == "Invalid package name."
+
+    def test_rejects_empty_package_name(self, workspace):
+        result = install_skill("", workspace)
+        assert result == "Invalid package name."
