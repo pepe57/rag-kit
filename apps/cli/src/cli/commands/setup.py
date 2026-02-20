@@ -379,11 +379,14 @@ def _print_no_serve_message(target_display: str) -> None:
     """Print app location and skip dev server message."""
     console.print()
     console.print(f"[dim]Your app is at: {target_display}[/dim]")
-    console.print("[dim]Run the dev server manually when ready.[/dim]")
     console.print()
     console.print(
-        "💬 [bold]Start your AI assistant:[/bold] "
-        "[cyan]cd[/cyan] [dim]<your-workspace>[/dim] [cyan]&&[/cyan] [bold]rag-facile[/bold]"
+        f"🚀 [bold]Start your app:[/bold]  "
+        f"[cyan]cd[/cyan] {target_display} [cyan]&&[/cyan] [bold]just run[/bold]"
+    )
+    console.print(
+        f"💬 [bold]Chat with your assistant:[/bold]  "
+        f"[cyan]cd[/cyan] {target_display} [cyan]&&[/cyan] [bold]rag-facile[/bold]"
     )
 
 
