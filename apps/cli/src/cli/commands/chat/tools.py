@@ -228,10 +228,12 @@ def _set_nested(data: dict, keys: list[str], value: Any) -> None:
 
 @tool
 def update_config(key: str, value: str) -> str:
-    """Update a parameter in ragfacile.toml after explicit user confirmation.
+    """Update a parameter in ragfacile.toml. Writes the file and git-commits the change.
 
-    IMPORTANT: Always explain the impact of the change to the user BEFORE
-    calling this tool, and only call it once the user has agreed.
+    ONLY call this tool after completing the mandatory two-step confirmation flow:
+      1. You explained the impact and asked "Puis-je effectuer ce changement ?"
+      2. The user replied with an explicit yes in a SEPARATE message.
+    A request like "mets top_k à 15" is NOT a confirmation — ask first.
 
     Args:
         key: Dotted config path, e.g. 'retrieval.top_k' or 'generation.model'.
