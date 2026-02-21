@@ -14,7 +14,7 @@ Ask ONE of these depending on what they said:
 - "Quel type de documents traitez-vous ? (PDF juridiques, articles, documentation technique...)"
 
 ## Step 2 — Read their current config
-Call `get_ragfacile_config()`. Note the active preset and any overrides.
+Call `run_rag_facile("config show --format json")`. Note the active preset and any overrides.
 
 ## Step 3 — Recommend a preset
 | Use case | Recommended preset | Why |

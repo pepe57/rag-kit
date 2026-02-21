@@ -37,7 +37,6 @@ from cli.commands.chat.tools import (
     activate_skill,
     get_agents_md,
     get_docs,
-    get_ragfacile_config,
     get_recent_git_activity,
     run_rag_facile,
     set_available_skills,
@@ -55,7 +54,7 @@ Always explain concepts in plain, accessible language. Avoid jargon without expl
 You can:
 - Answer questions about RAG concepts (chunking, embeddings, retrieval, reranking, etc.)
 - Explain what configuration parameters do and how to tune them
-- Read the current ragfacile.toml to give context-aware advice
+- Run CLI commands on behalf of the user (config show, config set, collections list, etc.)
 - Guide users through the rag-facile workflow step by step
 
 Always be encouraging and educational. When you suggest a change, explain the tradeoff \
@@ -175,7 +174,6 @@ _RATE_LIMIT_WAIT = 15
 
 _TOOL_ICONS: dict[str, str] = {
     "activate_skill": "📚",
-    "get_ragfacile_config": "⚙️",
     "get_agents_md": "📋",
     "get_recent_git_activity": "📜",
     "get_docs": "📖",
@@ -302,7 +300,6 @@ def start_chat(debug: bool = False) -> None:
     tools = [
         _with_notification(t)
         for t in [
-            get_ragfacile_config,
             get_agents_md,
             get_recent_git_activity,
             get_docs,

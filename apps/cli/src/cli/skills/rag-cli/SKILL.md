@@ -64,7 +64,7 @@ ALWAYS confirm with the user before running config set — explain the tradeoff 
 
 1. Call `run_rag_facile("collections list")` to show available collections
 2. Explain public vs private collections
-3. Call `get_ragfacile_config()` to read the current `storage.collections` list
+3. Call `run_rag_facile("config show --format json")` to read the current config (includes `storage.collections`)
 4. Compute the new list by adding or removing the requested ID(s)
 5. After user confirmation, call `run_rag_facile("config set storage.collections [id1, id2, ...]")`
 
