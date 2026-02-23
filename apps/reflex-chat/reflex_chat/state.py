@@ -1,9 +1,11 @@
 import os
 import json
+import time
 from typing import Any, TypedDict
 
 import reflex as rx
 from rag_facile.pipelines import process_bytes, process_query
+from rag_facile.tracing import get_current_trace_id, get_tracer
 from dotenv import load_dotenv
 
 from albert import AlbertClient, ChatCompletionMessageParam
@@ -219,6 +221,7 @@ class State(rx.State):
         # Retrieve relevant context via RAG pipeline (search -> rerank -> format)
         # Combine context with the current question to avoid accumulating
         # system messages in the conversation history.
+        _query_start = time.monotonic()
         retrieved_context = process_query(
             question, collection_ids=self.enabled_collection_ids
         )
@@ -264,6 +267,20 @@ class State(rx.State):
             # Albert API occasionally sends malformed SSE events; continue
             # with whatever content was streamed so far.
             pass
+
+        # Update trace with LLM response and latency
+        trace_id = get_current_trace_id()
+        if trace_id:
+            from datetime import datetime, timezone
+
+            answer = self._chats[self.current_chat][-1]["answer"]
+            latency_ms = int((time.monotonic() - _query_start) * 1000)
+            get_tracer().update_trace(
+                trace_id,
+                response=answer,
+                latency_ms=latency_ms,
+                response_at=datetime.now(timezone.utc),
+            )
 
         # Toggle the processing flag.
         self.processing = False

@@ -200,6 +200,10 @@ class AlbertPipeline(RAGPipeline):
         collection_ids = list(ids)
         logger.info("Searching collections: %s", collection_ids)
 
+        # Track data for tracing
+        expanded_queries: list[str] = []
+        retrieved_chunks: list[dict] = []
+
         # Step 0: Query expansion (optional)
         # When enabled, generates N query variants in formal French administrative
         # language. Results are merged via RRF before reranking.
@@ -208,6 +212,7 @@ class AlbertPipeline(RAGPipeline):
 
             expander = get_expander(client, config)
             queries = expander.expand(query)
+            expanded_queries = queries
             logger.info(
                 "Query expansion (%s): %d → %d queries",
                 config.query.strategy,
@@ -242,7 +247,11 @@ class AlbertPipeline(RAGPipeline):
         if not chunks:
             return ""
 
-        # Step 2 (was Step 2): Rerank — always uses the ORIGINAL query for precision
+        # Capture search results before reranking
+        retrieved_chunks = [dict(c) for c in chunks]
+
+        # Step 2: Rerank — always uses the ORIGINAL query for precision
+        reranked: list[dict] = []
         if config.reranking.enabled:
             chunks = rerank_chunks(
                 client,
@@ -251,9 +260,41 @@ class AlbertPipeline(RAGPipeline):
                 model=config.reranking.model,
                 top_n=config.reranking.top_n,
             )
+            reranked = [dict(c) for c in chunks]
 
-        # Step 3 (was Step 3): Format as LLM context
-        return format_context(chunks)
+        # Step 3: Format as LLM context
+        context = format_context(chunks)
+
+        # Step 4: Log trace (best-effort — never block the pipeline)
+        try:
+            from rag_facile.tracing import (
+                TraceRecord,
+                _notify_hook,
+                get_tracer,
+                set_current_trace_id,
+            )
+
+            trace = TraceRecord(
+                query=query,
+                expanded_queries=expanded_queries,
+                retrieved_chunks=retrieved_chunks,
+                reranked_chunks=reranked,
+                formatted_context=context,
+                collection_ids=[int(i) for i in collection_ids],
+                model=config.generation.model,
+                temperature=config.generation.temperature,
+                config_snapshot=config.model_dump(),
+            )
+            tracer = get_tracer(config)
+            tracer.log_trace(trace)
+            set_current_trace_id(trace.id)
+            _notify_hook(trace)
+            logger.debug("Logged trace %s", trace.id)
+        except Exception:  # noqa: BLE001
+            # Tracing must never break the pipeline — log and continue
+            logger.debug("Tracing failed (non-critical)", exc_info=True)
+
+        return context
 
     # ── Collection management (delegated to storage) ──
 

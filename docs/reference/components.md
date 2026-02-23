@@ -58,6 +58,7 @@ RAG Facile organizes the RAG pipeline into dedicated packages, each handling a s
 | **retrieval** | Search | Vector search across document collections (semantic, lexical, hybrid) |
 | **reranking** | Reranking | Re-score search results with a cross-encoder for higher precision |
 | **context** | Context Assembly | Format retrieved chunks into LLM-ready context strings with citations |
+| **tracing** | Observability | Log queries, context, responses, and user feedback for pipeline improvement |
 | **pipelines** | Orchestration | Coordinate all pipeline phases into a unified interface |
 
 ### Storage

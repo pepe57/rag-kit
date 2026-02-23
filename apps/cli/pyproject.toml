@@ -62,6 +62,7 @@ packages = ["src/cli"]
 "../../packages/reranking/src/rag_facile/reranking" = "cli/reranking_src"
 "../../packages/retrieval/src/rag_facile/retrieval" = "cli/retrieval_src"
 "../../packages/storage/src/rag_facile/storage" = "cli/storage_src"
+"../../packages/tracing/src/rag_facile/tracing" = "cli/tracing_src"
 "src/cli/templates/ragfacile.toml" = "cli/templates/ragfacile.toml"
 "../../docs" = "cli/docs"
 "src/cli/skills" = "cli/skills"

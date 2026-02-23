@@ -101,3 +101,11 @@ language = "fr"
 enabled = true  # Mandatory for legal
 style = "footnote"  # Formal citation style
 include_sources = true  # Show all sources consulted
+
+# ==============================================================================
+# TRACING & OBSERVABILITY
+# ==============================================================================
+[tracing]
+enabled = true
+provider = "sqlite"
+database = ".rag-facile/traces.db"
