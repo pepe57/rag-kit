@@ -4,10 +4,15 @@ Uses Python's stdlib :mod:`sqlite3` — zero external dependencies.
 The database file lives alongside the workspace (default:
 ``.rag-facile/traces.db``) and uses WAL mode for concurrent read
 access in multi-user web deployments.
+
+Config snapshots are normalised into a separate ``config_snapshots``
+table keyed by SHA-256 hash, so identical configs (the common case)
+are stored exactly once regardless of how many traces reference them.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sqlite3
@@ -20,6 +25,13 @@ from ._models import TraceRecord
 logger = logging.getLogger(__name__)
 
 # ── Schema ────────────────────────────────────────────────────────────────────
+
+_CREATE_CONFIG_TABLE = """\
+CREATE TABLE IF NOT EXISTS config_snapshots (
+    hash    TEXT PRIMARY KEY,
+    config  TEXT NOT NULL
+);
+"""
 
 _CREATE_TABLE = """\
 CREATE TABLE IF NOT EXISTS traces (
@@ -43,8 +55,8 @@ CREATE TABLE IF NOT EXISTS traces (
     temperature       REAL NOT NULL DEFAULT 0.0,
     latency_ms        INTEGER,
 
-    -- Config snapshot
-    config_snapshot   TEXT NOT NULL DEFAULT '{}',
+    -- Config snapshot (FK → config_snapshots.hash)
+    config_hash       TEXT NOT NULL DEFAULT '',
 
     -- User feedback
     feedback_score    INTEGER,
@@ -59,14 +71,13 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_traces_created ON traces (created_at DESC);",
 ]
 
-# JSON-serialised list/dict columns
+# JSON-serialised list/dict columns (on the traces table)
 _JSON_FIELDS = frozenset(
     {
         "expanded_queries",
         "retrieved_chunks",
         "reranked_chunks",
         "collection_ids",
-        "config_snapshot",
         "feedback_tags",
     }
 )
@@ -90,9 +101,25 @@ def _iso_to_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
+def _config_hash(config_dict: dict) -> str:
+    """Compute a deterministic SHA-256 hash of a config dict."""
+    canonical = json.dumps(config_dict, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def _row_to_trace(row: sqlite3.Row) -> TraceRecord:
-    """Convert a sqlite3.Row to a TraceRecord, deserialising JSON columns."""
+    """Convert a sqlite3.Row to a TraceRecord, deserialising JSON columns.
+
+    Expects the row to contain a ``config`` column (from a JOIN with
+    ``config_snapshots``) rather than an inline ``config_snapshot``.
+    """
     data = dict(row)
+
+    # Reconstruct config_snapshot from the joined config column
+    config_json = data.pop("config", None)
+    data.pop("config_hash", None)  # internal column, not in TraceRecord
+    data["config_snapshot"] = json.loads(config_json) if config_json else {}
+
     for key in _JSON_FIELDS:
         raw = data.get(key)
         if isinstance(raw, str):
@@ -131,9 +158,10 @@ class SQLiteProvider(TracingProvider):
         return conn
 
     def _init_db(self) -> None:
-        """Create the traces table and indexes if they don't exist."""
+        """Create the traces + config_snapshots tables and indexes."""
         conn = self._connect()
         try:
+            conn.execute(_CREATE_CONFIG_TABLE)
             conn.execute(_CREATE_TABLE)
             for idx_sql in _CREATE_INDEXES:
                 conn.execute(idx_sql)
@@ -145,9 +173,23 @@ class SQLiteProvider(TracingProvider):
     # ── TracingProvider interface ──
 
     def log_trace(self, trace: TraceRecord) -> str:
-        """Insert a new trace into the database."""
+        """Insert a new trace into the database.
+
+        The config snapshot is normalised: identical configs (keyed by
+        SHA-256 hash) are stored once in ``config_snapshots`` and
+        referenced from the trace row.  This is the common case — the
+        config only changes when the user edits ``ragfacile.toml``.
+        """
+        c_hash = _config_hash(trace.config_snapshot)
+
         conn = self._connect()
         try:
+            # Upsert config snapshot (INSERT OR IGNORE = skip if exists)
+            conn.execute(
+                "INSERT OR IGNORE INTO config_snapshots (hash, config) VALUES (?, ?)",
+                (c_hash, json.dumps(trace.config_snapshot)),
+            )
+
             conn.execute(
                 """
                 INSERT INTO traces (
@@ -155,7 +197,7 @@ class SQLiteProvider(TracingProvider):
                     query, expanded_queries, retrieved_chunks, reranked_chunks,
                     formatted_context, collection_ids,
                     response, model, temperature, latency_ms,
-                    config_snapshot,
+                    config_hash,
                     feedback_score, feedback_tags, feedback_comment
                 ) VALUES (
                     ?, ?, ?, ?, ?,
@@ -182,7 +224,7 @@ class SQLiteProvider(TracingProvider):
                     trace.model,
                     trace.temperature,
                     trace.latency_ms,
-                    json.dumps(trace.config_snapshot),
+                    c_hash,
                     trace.feedback_score,
                     json.dumps(trace.feedback_tags),
                     trace.feedback_comment,
@@ -224,10 +266,18 @@ class SQLiteProvider(TracingProvider):
             conn.close()
 
     def get_trace(self, trace_id: str) -> TraceRecord | None:
-        """Retrieve a single trace by ID."""
+        """Retrieve a single trace by ID (with config snapshot joined)."""
         conn = self._connect()
         try:
-            cursor = conn.execute("SELECT * FROM traces WHERE id = ?", (trace_id,))
+            cursor = conn.execute(
+                """
+                SELECT t.*, c.config
+                FROM traces t
+                LEFT JOIN config_snapshots c ON t.config_hash = c.hash
+                WHERE t.id = ?
+                """,
+                (trace_id,),
+            )
             row = cursor.fetchone()
         finally:
             conn.close()
@@ -249,14 +299,18 @@ class SQLiteProvider(TracingProvider):
         params: list[object] = []
 
         if session_id is not None:
-            conditions.append("session_id = ?")
+            conditions.append("t.session_id = ?")
             params.append(session_id)
         if user_id is not None:
-            conditions.append("user_id = ?")
+            conditions.append("t.user_id = ?")
             params.append(user_id)
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        sql = f"SELECT * FROM traces {where} ORDER BY created_at DESC LIMIT ? OFFSET ?"  # noqa: S608
+        sql = (  # noqa: S608
+            f"SELECT t.*, c.config FROM traces t "
+            f"LEFT JOIN config_snapshots c ON t.config_hash = c.hash "
+            f"{where} ORDER BY t.created_at DESC LIMIT ? OFFSET ?"
+        )
         params.extend([limit, offset])
 
         conn = self._connect()

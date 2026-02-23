@@ -109,6 +109,43 @@ class TestLogTrace:
         assert retrieved.config_snapshot["meta"]["preset"] == "balanced"
         assert retrieved.config_snapshot["retrieval"]["top_k"] == 10
 
+    def test_config_snapshots_are_deduplicated(self, db_path: Path):
+        """Identical configs should be stored only once in config_snapshots."""
+        provider = SQLiteProvider(db_path)
+        config = {"meta": {"preset": "balanced"}, "retrieval": {"top_k": 10}}
+
+        # Log 3 traces with the same config
+        for i in range(3):
+            provider.log_trace(TraceRecord(query=f"q{i}", config_snapshot=config))
+
+        # Verify: only 1 row in config_snapshots, 3 rows in traces
+        conn = sqlite3.connect(str(db_path))
+        config_rows = conn.execute("SELECT COUNT(*) FROM config_snapshots").fetchone()[
+            0
+        ]
+        trace_rows = conn.execute("SELECT COUNT(*) FROM traces").fetchone()[0]
+        conn.close()
+
+        assert config_rows == 1, f"Expected 1 config row, got {config_rows}"
+        assert trace_rows == 3
+
+    def test_different_configs_stored_separately(self, db_path: Path):
+        """Different configs should each get their own row."""
+        provider = SQLiteProvider(db_path)
+
+        provider.log_trace(
+            TraceRecord(query="q1", config_snapshot={"preset": "balanced"})
+        )
+        provider.log_trace(TraceRecord(query="q2", config_snapshot={"preset": "fast"}))
+
+        conn = sqlite3.connect(str(db_path))
+        config_rows = conn.execute("SELECT COUNT(*) FROM config_snapshots").fetchone()[
+            0
+        ]
+        conn.close()
+
+        assert config_rows == 2
+
 
 class TestUpdateTrace:
     """Tests for update_trace."""
