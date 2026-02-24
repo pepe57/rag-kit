@@ -1,14 +1,14 @@
-# Bienvenue sur RAG Facile
+# Welcome to RAG Facile
 
-Cet assistant vous aide a interroger vos documents grace a la technologie RAG (Retrieval-Augmented Generation).
+This assistant helps you query your documents using RAG (Retrieval-Augmented Generation) technology.
 
-## Comment utiliser cet outil
+## How to use
 
-- **Posez une question** directement dans la barre de saisie ci-dessous
-- **Importez un document** (PDF, Markdown, HTML) en cliquant sur l'icone de trombone
-- **Activez des collections** via l'icone de reglages pour interroger les bases de connaissances publiques
+- **Ask a question** directly in the input bar below
+- **Upload a document** (PDF, Markdown, HTML) by clicking the paperclip icon
+- **Enable collections** via the settings icon to query public knowledge bases
 
-## Ressources utiles
+## Useful resources
 
-- Decouvrez le fonctionnement du RAG dans le [guide d'utilisation](https://github.com/etalab-ia/rag-facile)
-- Consultez la documentation des [collections publiques](https://github.com/etalab-ia/rag-facile/blob/main/docs/reference/components.md)
+- Learn how RAG works in the [user guide](https://github.com/etalab-ia/rag-facile)
+- Browse the [public collections](https://github.com/etalab-ia/rag-facile/blob/main/docs/reference/components.md) documentation
