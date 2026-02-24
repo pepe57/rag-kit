@@ -146,22 +146,27 @@ def navbar():
                 content="La conversation en cours.",
             ),
             size="3",
-            variant="soft",
+            variant="solid",
+            color_scheme="blue",
             margin_inline_end="auto",
         ),
-        modal(
-            rx.icon_button("message-square-plus"),
+        rx.hstack(
+            modal(
+                rx.icon_button("message-square-plus"),
+            ),
+            sidebar(
+                rx.icon_button(
+                    "messages-square",
+                    background_color=rx.color("slate", 6),
+                )
+            ),
+            theme_toggle(),
+            gap="1rem",  # DSFR 4v between action buttons
+            align_items="center",
         ),
-        sidebar(
-            rx.icon_button(
-                "messages-square",
-                background_color=rx.color("slate", 6),
-            )
-        ),
-        theme_toggle(),
         justify_content="space-between",
         align_items="center",
-        padding="12px",
+        padding="0.5rem 1rem",  # DSFR 2v / 4v
         border_bottom=f"1px solid {rx.color('slate', 3)}",
         background_color=rx.color("slate", 2),
     )
