@@ -494,6 +494,32 @@ class FormattingConfig(BaseModel):
 
 
 # ==============================================================================
+# TRACING & OBSERVABILITY
+# ==============================================================================
+
+
+class TracingConfig(BaseModel):
+    """Configuration for pipeline tracing and observability.
+
+    Traces capture queries, retrieved chunks, LLM responses, and user
+    feedback for debugging, tuning, and evaluation.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable trace logging for RAG queries",
+    )
+    provider: Literal["sqlite", "none"] = Field(
+        default="sqlite",
+        description='Trace storage backend ("sqlite" built-in, "none" disabled)',
+    )
+    database: str = Field(
+        default=".rag-facile/traces.db",
+        description="SQLite database path (relative to workspace root)",
+    )
+
+
+# ==============================================================================
 # ROOT CONFIG
 # ==============================================================================
 
@@ -565,6 +591,10 @@ class RAGConfig(BaseModel):
     formatting: FormattingConfig = Field(
         default_factory=FormattingConfig,
         description="Answer formatting",
+    )
+    tracing: TracingConfig = Field(
+        default_factory=TracingConfig,
+        description="Pipeline tracing and observability",
     )
 
     model_config = {
@@ -684,6 +714,13 @@ PIPELINE_STAGES: list[PipelineStage] = [
         description="Generate an answer from the assembled context using an LLM.",
         emoji="\U0001f4ac",
         model=GenerationConfig,
+    ),
+    PipelineStage(
+        key="tracing",
+        title="Tracing & Observability",
+        description="Log queries, retrieved context, responses, and user feedback for pipeline improvement.",
+        emoji="\U0001f50d",
+        model=TracingConfig,
     ),
     PipelineStage(
         key="hallucination",

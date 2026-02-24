@@ -190,7 +190,26 @@ language = "fr"                 # "fr" or "en"
 enabled = true                  # Add source citations ([1], [2], ...)
 style = "inline"                # "inline" or "footnote"
 include_sources = true          # Append source list to response
+
+# ── TRACING & OBSERVABILITY ──────────────────────────────────
+[tracing]
+enabled = true                  # Enable trace logging for RAG queries
+provider = "sqlite"             # "sqlite" (built-in) or "none" (disabled)
+database = ".rag-facile/traces.db"  # SQLite database path (relative to workspace)
 ```
+
+### About Tracing
+
+Tracing automatically logs every RAG query: the user's question, retrieved chunks, reranked results, formatted context, and the LLM response. This data helps you:
+
+- **Debug** poor answers by inspecting what context was assembled
+- **Tune** pipeline parameters by comparing traces across config changes
+- **Evaluate** quality by feeding traces into automated evaluation tools
+- **Collect feedback** to close the loop between user satisfaction and pipeline quality
+
+The SQLite provider stores traces in a local database file alongside your workspace. It uses WAL mode for safe concurrent access when multiple users query the app simultaneously.
+
+Set `enabled = false` or `provider = "none"` to disable tracing entirely.
 
 ## Presets
 

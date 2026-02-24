@@ -96,3 +96,11 @@ language = "fr"
 enabled = true
 style = "inline"
 include_sources = false  # Skip for speed
+
+# ==============================================================================
+# TRACING & OBSERVABILITY
+# ==============================================================================
+[tracing]
+enabled = true
+provider = "sqlite"
+database = ".rag-facile/traces.db"

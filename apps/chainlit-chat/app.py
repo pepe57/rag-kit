@@ -1,12 +1,14 @@
 import ast
 import json
 import os
+import time
 
 import chainlit as cl
 import engineio
 import engineio.payload
 from chainlit.input_widget import Switch
 from rag_facile.pipelines import get_accepted_mime_types, process_file, process_query
+from rag_facile.tracing import update_trace_with_response
 from dotenv import load_dotenv
 
 from albert import AsyncAlbertClient
@@ -157,6 +159,7 @@ async def main(message: cl.Message):
 
     # Retrieve relevant context using active collections
     active_collections: list[int] = cl.user_session.get("active_collections") or []
+    _query_start = time.monotonic()
     retrieved_context = process_query(
         message.content, collection_ids=active_collections
     )
@@ -273,5 +276,8 @@ async def main(message: cl.Message):
 
     # Add assistant response to history for proper conversation continuity
     message_history.append({"role": "assistant", "content": msg.content})
+
+    # Update trace with LLM response and latency
+    update_trace_with_response(msg.content, _query_start)
 
     await msg.update()
