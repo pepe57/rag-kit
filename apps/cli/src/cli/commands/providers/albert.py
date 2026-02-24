@@ -1,24 +1,16 @@
 """Albert API provider for Data Foundry.
 
-Uses Albert API (OpenGateLLM) with hybrid search for document retrieval
-and OpenAI-compatible LLM for Q/A generation.
+Uses Albert API (OpenGateLLM) for document ingestion, search, and Q/A generation.
+Leverages the rag_facile pipeline packages (ingestion, storage, retrieval) for
+consistency with the main RAG pipeline.
 """
 
 import json
 import logging
+import time
 from collections.abc import Iterator
-from datetime import datetime, timezone
 from pathlib import Path
 
-
-try:
-    from albert import AlbertClient
-except ImportError as e:
-    raise ImportError(
-        "albert-client package is required. Install with: uv add albert-client"
-    ) from e
-
-from .document_preprocessor import DocumentPreprocessor
 from .schema import GeneratedSample
 
 
@@ -28,38 +20,48 @@ logger = logging.getLogger(__name__)
 class AlbertApiProvider:
     """Data Foundry provider using Albert API (OpenGateLLM).
 
-    This provider uploads documents to Albert's collections API, uses
-    hybrid search for context retrieval, and streams generated Q/A pairs
-    from an OpenAI-compatible LLM.
+    Uses the rag_facile pipeline packages for document processing, storage,
+    and retrieval. This ensures consistency with the main RAG pipeline.
+
+    The provider:
+    1. Uploads documents to Albert collections (via storage provider)
+    2. Searches collections using configured retrieval strategy
+    3. Generates Q/A pairs from search results via LLM streaming
+
+    All parameters (chunking, retrieval, generation) come from ragfacile.toml.
     """
 
-    def __init__(self, api_key: str, base_url: str, model: str):
-        """Initialize the Albert API provider.
+    def __init__(self):
+        """Initialize the Albert API provider."""
+        from rag_facile.core import get_config
+        from rag_facile.ingestion import get_provider as get_ingestion_provider
+        from rag_facile.storage import get_provider as get_storage_provider
 
-        Args:
-            api_key: OpenAI-compatible API key for Albert API
-            base_url: Base URL for Albert API (e.g., http://localhost:8000)
-            model: Model name to use for LLM (e.g., "mistral-7b")
-        """
-        self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+        self.config = get_config()
+        self._ingestion = get_ingestion_provider(self.config)
+        self._storage = get_storage_provider(self.config)
 
-        # Initialize Albert client for all API operations
-        self.albert_client = AlbertClient(api_key=api_key, base_url=self.base_url)
-
-        # Initialize document preprocessor for PDF extraction
-        self.preprocessor = DocumentPreprocessor()
-
-        # Track resources for cleanup
+        # Lazily initialized on first use
+        self._client = None
         self.collection_id: int | None = None
+
+    @property
+    def client(self):
+        """Lazily create Albert client on first use."""
+        if self._client is None:
+            from albert import AlbertClient
+
+            self._client = AlbertClient()
+        return self._client
 
     def upload_documents(self, document_paths: list[str]) -> None:
         """Upload documents to Albert and create a collection.
 
+        Uses the rag_facile storage provider for Albert collections, which
+        respects chunking parameters from ragfacile.toml.
+
         Args:
-            document_paths: List of paths to documents (PDF, MD, TXT)
-                           PDFs are automatically converted to markdown text.
+            document_paths: List of paths to documents (PDF, MD, HTML)
         """
         logger.info(
             f"Starting document upload to Albert API ({len(document_paths)} documents)"
@@ -67,42 +69,33 @@ class AlbertApiProvider:
         for doc_path in document_paths:
             logger.debug(f"  - {doc_path}")
 
-        # Preprocess documents (extract PDFs to text)
-        processed_paths = self.preprocessor.process_documents(document_paths)
-        logger.info(f"Preprocessed {len(processed_paths)} documents")
-
-        # Create a collection using SDK
-        collection_name = (
-            f"data_foundry_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-        )
-
-        collection = self.albert_client.create_collection(
+        # Create a collection using the storage provider
+        collection_name = f"data_foundry_{int(time.time() * 1000)}"
+        self.collection_id = self._storage.create_collection(
+            self.client,
             name=collection_name,
             description="RAG Facile Data Foundry",
         )
-        self.collection_id = collection.id
-
         logger.info(f"Created Albert collection: {self.collection_id}")
 
-        # Upload each processed document using SDK
-        for i, doc_path in enumerate(processed_paths, 1):
-            logger.info(
-                f"Uploading document {i}/{len(processed_paths)}: {Path(doc_path).name}"
+        # Upload documents using the storage provider
+        # (which respects config.chunking.chunk_size and chunk_overlap)
+        try:
+            self._storage.ingest_documents(
+                self.client,
+                [Path(p) for p in document_paths],
+                self.collection_id,
             )
-            logger.debug(f"  Size: {Path(doc_path).stat().st_size} bytes")
-
-            try:
-                self.albert_client.upload_document(
-                    file_path=doc_path, collection_id=self.collection_id
-                )
-                logger.debug("  Upload successful")
-            except Exception as e:
-                error_msg = f"Failed to upload {doc_path}: {e}"
-                logger.error(error_msg)
-                raise RuntimeError(error_msg) from e
+            logger.info(
+                f"Ingested {len(document_paths)} documents into collection {self.collection_id}"
+            )
+        except Exception as e:
+            error_msg = f"Failed to ingest documents: {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg) from e
 
     def generate(self, num_samples: int) -> Iterator[GeneratedSample]:
-        """Generate Q/A samples using hybrid search and LLM.
+        """Generate Q/A samples using retrieval from the collection and LLM.
 
         Args:
             num_samples: Target number of samples to generate
@@ -123,15 +116,16 @@ class AlbertApiProvider:
         logger.debug(f"Generation prompt ({len(prompt)} chars):\n{prompt}\n")
 
         # Stream the response from LLM
-        # The LLM will be responsible for calling search internally
         logger.info(f"Sending prompt to Albert API (collection: {self.collection_id})")
         seen_samples: set[str] = set()
         buffer = ""
         total_response = ""
 
         try:
-            stream = self.albert_client.chat.completions.create(
-                model=self.model,
+            # Use the configured model for generation (defaults to openai/gpt-oss-120b)
+            model = self.config.generation.model
+            stream = self.client.chat.completions.create(
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
                 stream=True,
             )
@@ -173,24 +167,18 @@ class AlbertApiProvider:
                 yield sample
 
     def cleanup(self) -> None:
-        """Delete collection from Albert API and clean up temporary files."""
+        """Delete collection from Albert API."""
         if self.collection_id:
             try:
-                self.albert_client.delete_collection(self.collection_id)
+                self._storage.delete_collection(self.client, self.collection_id)
             except Exception:
                 pass  # Non-critical
-
-        # Clean up temporary files created during preprocessing
-        try:
-            self.preprocessor.cleanup()
-        except Exception:
-            pass  # Non-critical
 
     def _retrieve_document_context(self) -> str:
         """Retrieve sample passages from the collection to ground generation.
 
-        Uses broad searches to get a representative sample of the document's
-        content, which is then included in the prompt to prevent hallucination.
+        Uses the rag_facile retrieval package with configured search strategy
+        to get representative passages from the uploaded documents.
 
         Returns:
             A formatted string containing sample passages from the document
@@ -199,10 +187,9 @@ class AlbertApiProvider:
             return "[Document context not available]"
 
         try:
-            import time
+            from rag_facile.retrieval import search_chunks
 
             # Delay to allow document indexing in Albert
-            # (Search may take time to index newly uploaded documents)
             time.sleep(2.0)
 
             # Use several broad search queries to capture different aspects
@@ -217,27 +204,20 @@ class AlbertApiProvider:
             passages = []
             for query in search_queries:
                 try:
-                    results = self.albert_client.search(
-                        prompt=query,
-                        collections=[self.collection_id],
+                    # Use the retrieval package with configured strategy
+                    chunks = search_chunks(
+                        self.client,
+                        query,
+                        [self.collection_id],
                         limit=2,
+                        method=self.config.retrieval.strategy,
+                        score_threshold=self.config.retrieval.score_threshold,
                     )
-                    # SearchResponse has a .data attribute
-                    result_list = results.data if hasattr(results, "data") else results
-                    if result_list:
-                        for result in result_list:
-                            # Results can be dicts or objects
-                            text = (
-                                result.get("text", "")
-                                if isinstance(result, dict)
-                                else getattr(result, "text", "")
-                            )
-                            if not text:
-                                text = (
-                                    result.get("content", "")
-                                    if isinstance(result, dict)
-                                    else getattr(result, "content", "")
-                                )
+
+                    if chunks:
+                        for chunk in chunks:
+                            # Chunks are dicts with 'text' key
+                            text = chunk.get("text", "")
                             if text and text not in passages:
                                 passages.append(text[:500])  # Limit passage length
                 except Exception as e:
