@@ -100,14 +100,36 @@ def collection_badge(item: dict[str, str]) -> rx.Component:
     col_id = item["id"]
     name = item["name"]
     is_active = item["enabled"] == "True"
-    return rx.badge(
-        rx.icon("database", size=12),
-        name,
-        variant=rx.cond(is_active, "solid", "outline"),
-        color_scheme=rx.cond(is_active, "green", "gray"),
+    return rx.box(
+        rx.hstack(
+            rx.icon("database", size=12),
+            rx.text(name, font_size="0.8em", weight="medium"),
+            spacing="1",
+            align_items="center",
+        ),
+        padding="4px 10px",
+        border_radius="4px",
         cursor="pointer",
         on_click=State.toggle_collection(col_id),
-        size="1",
+        background_color=rx.cond(
+            is_active,
+            "var(--dsfr-blue-france)",
+            rx.color("slate", 3),
+        ),
+        color=rx.cond(is_active, "white", rx.color("slate", 11)),
+        border=rx.cond(
+            is_active,
+            "1px solid var(--dsfr-blue-france)",
+            f"1px solid {rx.color('slate', 6)}",
+        ),
+        transition="all 0.15s ease",
+        _hover={
+            "background_color": rx.cond(
+                is_active,
+                "var(--dsfr-blue-france-hover)",
+                rx.color("slate", 4),
+            ),
+        },
     )
 
 
@@ -116,16 +138,23 @@ def collection_badges() -> rx.Component:
     return rx.cond(
         State.collection_items,
         rx.flex(
-            rx.text(
-                "📚",
-                font_size="0.75em",
-                color=rx.color("slate", 10),
+            rx.hstack(
+                rx.icon("library", size=14, color=rx.color("slate", 9)),
+                rx.text(
+                    "Collections",
+                    font_size="0.75em",
+                    weight="medium",
+                    color=rx.color("slate", 9),
+                ),
+                spacing="1",
+                align_items="center",
             ),
             rx.foreach(State.collection_items, collection_badge),
             wrap="wrap",
             gap="2",
             align_items="center",
-            padding="4px 12px",
+            justify_content="center",
+            padding="8px 12px",
         ),
     )
 
