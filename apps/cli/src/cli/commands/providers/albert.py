@@ -209,33 +209,55 @@ class AlbertApiProvider:
             yield from self._extract_json_objects(text, seen_samples)
 
     def _search_for_chunk_ids(self, question: str) -> tuple[list[int], list[str]]:
-        """Search the collection for chunks relevant to a specific question.
+        """Search and rerank using the configured pipeline settings.
+
+        Loads the same ragfacile.toml config as the evaluation pipeline to ensure
+        consistent retrieval and reranking behavior between dataset generation
+        and evaluation.
 
         Returns:
             tuple of (chunk_ids, chunk_contents)
-            These become the ground truth for recall@k/precision@k metrics.
         """
         if not self.collection_id:
             return [], []
 
         try:
+            from rag_facile.core import get_config
             from rag_facile.retrieval import search_chunks
+            from rag_facile.reranking import rerank_chunks
 
-            chunks = search_chunks(
+            # Load config — same as eval time
+            config = get_config()
+
+            # Search using configured strategy
+            search_results = search_chunks(
                 self.client,
                 question,
                 [self.collection_id],
-                limit=self.config.retrieval.top_k,
-                method=self.config.retrieval.strategy,
-                score_threshold=self.config.retrieval.score_threshold,
+                limit=config.retrieval.top_k,
+                method=config.retrieval.strategy,
+                score_threshold=config.retrieval.score_threshold,
             )
+
+            if not search_results:
+                return [], []
+
+            # Rerank using configured model and top_n
+            reranked = rerank_chunks(
+                self.client,
+                question,
+                search_results,
+                model=config.reranking.model,
+                top_n=config.reranking.top_n,
+            )
+
             chunk_ids = [
-                chunk.get("chunk_id", 0) for chunk in chunks if chunk.get("chunk_id")
+                chunk.get("chunk_id", 0) for chunk in reranked if chunk.get("chunk_id")
             ]
-            chunk_contents = [chunk.get("content", "") for chunk in chunks]
+            chunk_contents = [chunk.get("content", "") for chunk in reranked]
             return chunk_ids, chunk_contents
         except Exception as e:
-            logger.debug(f"Failed to search for chunk IDs for question: {e}")
+            logger.debug(f"Failed to retrieve/rerank chunks: {e}")
             return [], []
 
     def _extract_json_objects(
