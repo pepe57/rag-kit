@@ -84,11 +84,9 @@ def run(
     console.print(f"  Model: {model}")
     console.print(f"  Logs: {effective_log_dir}\n")
 
-    # Find the task module
+    # Verify the evaluation package is installed
     try:
         import rag_facile.evaluation._tasks  # noqa: F401  # ty: ignore[unresolved-import]
-
-        task_module = rag_facile.evaluation._tasks.__file__
     except ImportError:
         console.print(
             "[red]evaluation package not installed. "
@@ -96,13 +94,16 @@ def run(
         )
         raise typer.Exit(code=1)
 
-    # Run Inspect AI via subprocess
+    # Run Inspect AI via subprocess.
+    # Pass the dotted module name — Inspect AI's task loader accepts both
+    # relative file paths and importable module names.  Absolute file paths
+    # fail on Python 3.13 because pathlib.glob() rejects non-relative patterns.
     cmd = [
         sys.executable,
         "-m",
         "inspect_ai._cli.main",
         "eval",
-        str(task_module),
+        "rag_facile.evaluation._tasks",
         "--model",
         model,
         "--log-dir",
