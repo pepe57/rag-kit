@@ -1,14 +1,14 @@
-# {{ welcome_message }}
+# Welcome to RAG Facile
 
-Hi there, Developer! 👋 We're excited to have you on board. Chainlit is a powerful tool designed to help you prototype, debug and share applications built on top of LLMs.
+This assistant helps you query your documents using RAG (Retrieval-Augmented Generation) technology.
 
-## Useful Links 🔗
+## How to use
 
-- **Documentation:** Get started with our comprehensive [Chainlit Documentation](https://docs.chainlit.io) 📚
-- **Discord Community:** Join our friendly [Chainlit Discord](https://discord.gg/k73SQ3FyUh) to ask questions, share your projects, and connect with other developers! 💬
+- **Ask a question** directly in the input bar below
+- **Upload a document** (PDF, Markdown, HTML) by clicking the paperclip icon
+- **Enable collections** via the settings icon to query public knowledge bases
 
-We can't wait to see what you create with Chainlit! Happy coding! 💻😊
+## Useful resources
 
-## Welcome screen
-
-To modify the welcome screen, edit the `chainlit.md` file at the root of your project. If you do not want a welcome screen, just leave this file empty.
+- Learn how RAG works in the [user guide](https://github.com/etalab-ia/rag-facile)
+- Browse the [public collections](https://github.com/etalab-ia/rag-facile/blob/main/docs/reference/components.md) documentation
