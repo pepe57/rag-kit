@@ -100,61 +100,44 @@ def collection_badge(item: dict[str, str]) -> rx.Component:
     col_id = item["id"]
     name = item["name"]
     is_active = item["enabled"] == "True"
-    return rx.box(
-        rx.hstack(
-            rx.icon("database", size=12),
-            rx.text(name, font_size="0.8em", weight="medium"),
-            spacing="1",
-            align_items="center",
+    return rx.el.label(
+        rx.checkbox(
+            checked=is_active,
+            on_change=lambda _val: State.toggle_collection(col_id),
+            color_scheme="blue",
+            size="2",
         ),
-        padding="4px 10px",
-        border_radius="4px",
+        rx.text(name, font_size="0.85em"),
+        display="flex",
+        align_items="center",
+        gap="6px",
         cursor="pointer",
-        on_click=State.toggle_collection(col_id),
-        background_color=rx.cond(
-            is_active,
-            "var(--dsfr-blue-france)",
-            rx.color("slate", 3),
-        ),
-        color=rx.cond(is_active, "white", rx.color("slate", 11)),
-        border=rx.cond(
-            is_active,
-            "1px solid var(--dsfr-blue-france)",
-            f"1px solid {rx.color('slate', 6)}",
-        ),
-        transition="all 0.15s ease",
-        _hover={
-            "background_color": rx.cond(
-                is_active,
-                "var(--dsfr-blue-france-hover)",
-                rx.color("slate", 4),
-            ),
-        },
+        padding="4px 0",
     )
 
 
 def collection_badges() -> rx.Component:
-    """Render toggle badges for configured collections."""
+    """Render collection toggle checkboxes (DSFR case a cocher pattern)."""
     return rx.cond(
         State.collection_items,
-        rx.flex(
-            rx.hstack(
-                rx.icon("library", size=14, color=rx.color("slate", 9)),
-                rx.text(
-                    "Collections",
-                    font_size="0.75em",
-                    weight="medium",
-                    color=rx.color("slate", 9),
-                ),
-                spacing="1",
+        rx.hstack(
+            rx.text(
+                "Collections :",
+                font_size="0.8em",
+                weight="medium",
+                color=rx.color("slate", 10),
+                white_space="nowrap",
+            ),
+            rx.flex(
+                rx.foreach(State.collection_items, collection_badge),
+                wrap="wrap",
+                gap="4",
                 align_items="center",
             ),
-            rx.foreach(State.collection_items, collection_badge),
-            wrap="wrap",
-            gap="2",
             align_items="center",
             justify_content="center",
-            padding="8px 12px",
+            spacing="3",
+            padding="8px 16px",
         ),
     )
 
