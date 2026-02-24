@@ -121,8 +121,10 @@ class AlbertApiProvider:
         total_response = ""
 
         try:
-            # Use the configured model for generation
-            model = self.config.generation.model
+            # Use the eval-specific generation model (openweight-large by default)
+            # This is intentionally separate from config.generation.model which
+            # controls the RAG pipeline LLM.
+            model = self.config.eval.generation_model
             stream = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],

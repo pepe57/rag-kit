@@ -83,6 +83,10 @@ class EvalConfig(BaseModel):
         default="data/evals/logs",
         description="Directory for Inspect AI evaluation logs",
     )
+    generation_model: str = Field(
+        default="openweight-large",
+        description="Model for dataset generation (uses openweight-large for best Q/A quality)",
+    )
 
 
 # ==============================================================================
