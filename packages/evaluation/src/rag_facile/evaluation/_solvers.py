@@ -30,10 +30,12 @@ def _call_pipeline(question: str) -> tuple[str, list[int]]:
     # Get the formatted context from the pipeline
     context = pipeline.process_query(question)
 
-    # Extract chunk IDs from a fresh search using the same config
+    # Extract chunk IDs from search (and optionally rerank using the same config).
     # The pipeline internally calls search_chunks, but we recreate that call
     # to capture the chunk IDs directly (they're not exposed by process_query).
     try:
+        from rag_facile.reranking import rerank_chunks
+
         # Get collections: explicit, session, or from config
         collection_ids = config.storage.collections
         if pipeline._collection_id:
@@ -49,8 +51,22 @@ def _call_pipeline(question: str) -> tuple[str, list[int]]:
                 method=config.retrieval.strategy,
                 score_threshold=config.retrieval.score_threshold,
             )
+
+            # Apply reranking if enabled in config
+            final_chunks = chunks
+            if config.reranking.enabled:
+                final_chunks = rerank_chunks(
+                    client,
+                    question,
+                    chunks,
+                    model=config.reranking.model,
+                    top_n=config.reranking.top_n,
+                )
+
             chunk_ids = [
-                chunk.get("chunk_id", 0) for chunk in chunks if chunk.get("chunk_id")
+                chunk.get("chunk_id", 0)
+                for chunk in final_chunks
+                if chunk.get("chunk_id")
             ]
             return context, chunk_ids
     except Exception:

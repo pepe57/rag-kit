@@ -209,14 +209,15 @@ class AlbertApiProvider:
             yield from self._extract_json_objects(text, seen_samples)
 
     def _search_for_chunk_ids(self, question: str) -> tuple[list[int], list[str]]:
-        """Search and rerank using the configured pipeline settings.
+        """Search and optionally rerank chunks using configured pipeline settings.
 
-        Loads the same ragfacile.toml config as the evaluation pipeline to ensure
-        consistent retrieval and reranking behavior between dataset generation
-        and evaluation.
+        Uses the same retrieval and reranking config as the evaluation pipeline.
+        If reranking is enabled in ragfacile.toml, applies it here so the
+        "relevant" chunks captured during generation match what the eval pipeline
+        retrieves.
 
         Returns:
-            tuple of (chunk_ids, chunk_contents)
+            tuple of (chunk_ids, chunk_contents) — top-k search or top-n reranked
         """
         if not self.collection_id:
             return [], []
@@ -226,7 +227,7 @@ class AlbertApiProvider:
             from rag_facile.retrieval import search_chunks
             from rag_facile.reranking import rerank_chunks
 
-            # Load config — same as eval time
+            # Load config — same settings as eval time
             config = get_config()
 
             # Search using configured strategy
@@ -242,19 +243,23 @@ class AlbertApiProvider:
             if not search_results:
                 return [], []
 
-            # Rerank using configured model and top_n
-            reranked = rerank_chunks(
-                self.client,
-                question,
-                search_results,
-                model=config.reranking.model,
-                top_n=config.reranking.top_n,
-            )
+            # Apply reranking if enabled in config
+            final_chunks = search_results
+            if config.reranking.enabled:
+                final_chunks = rerank_chunks(
+                    self.client,
+                    question,
+                    search_results,
+                    model=config.reranking.model,
+                    top_n=config.reranking.top_n,
+                )
 
             chunk_ids = [
-                chunk.get("chunk_id", 0) for chunk in reranked if chunk.get("chunk_id")
+                chunk.get("chunk_id", 0)
+                for chunk in final_chunks
+                if chunk.get("chunk_id")
             ]
-            chunk_contents = [chunk.get("content", "") for chunk in reranked]
+            chunk_contents = [chunk.get("content", "") for chunk in final_chunks]
             return chunk_ids, chunk_contents
         except Exception as e:
             logger.debug(f"Failed to retrieve/rerank chunks: {e}")
