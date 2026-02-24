@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import Solver, TaskState, solver
 
 
@@ -10,9 +11,10 @@ def inject_rag_context() -> Solver:
     """Inject pre-computed RAG context into the prompt.
 
     Reads ``retrieved_contexts`` from the sample metadata and prepends
-    them to the user's input as a context block.  This enables offline
-    evaluation: the retrieval step is already done (by the dataset), and
-    the model only needs to generate an answer given that context.
+    them to the first user message as a context block.  This enables
+    offline evaluation: the retrieval step is already done (by the
+    dataset), and the model only needs to generate an answer given that
+    context.
     """
 
     async def solve(state: TaskState, generate: object) -> TaskState:  # noqa: ARG001
@@ -31,7 +33,13 @@ def inject_rag_context() -> Solver:
             f"## Question\n{original_input}"
         )
 
-        state.input_text = augmented_input
+        # Replace the first user message with the augmented version.
+        # state.input_text is read-only; the correct API is to update
+        # state.messages which has a setter.
+        state.messages = [
+            ChatMessageUser(content=augmented_input),
+            *state.messages[1:],
+        ]
         return state
 
     return solve

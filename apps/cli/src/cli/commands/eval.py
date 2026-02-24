@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -85,7 +86,7 @@ def run(
 
     # Find the task module
     try:
-        import rag_facile.evaluation._tasks  # noqa: F401
+        import rag_facile.evaluation._tasks  # noqa: F401  # ty: ignore[unresolved-import]
 
         task_module = rag_facile.evaluation._tasks.__file__
     except ImportError:
@@ -196,8 +197,6 @@ def list_runs(
     for f in log_files[:20]:  # Show latest 20
         stat = f.stat()
         size_kb = stat.st_size / 1024
-        from datetime import datetime, timezone
-
         mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
         table.add_row(
             f.name,

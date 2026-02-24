@@ -59,7 +59,6 @@ exclude = [
     ".moon/templates",
     "apps/chainlit-chat/app.py",
     "apps/reflex-chat",
-    "apps/cli/src/cli/commands/eval.py",
     "packages/pipelines",
     "packages/tracing",
     "packages/evaluation",

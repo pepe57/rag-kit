@@ -190,15 +190,18 @@ def rag_eval_scorer(model: str | None = None) -> Scorer:
         p = await _precision(state, target)
         f = await _faithful(state, target)
 
+        r_val = float(r.value) if isinstance(r.value, (int, float)) else 0.0
+        p_val = float(p.value) if isinstance(p.value, (int, float)) else 0.0
+        f_val = float(f.value) if isinstance(f.value, (int, float)) else 0.0
+
         return Score(
             value={
-                "recall": r.value,
-                "precision": p.value,
-                "faithfulness": f.value,
+                "recall": r_val,
+                "precision": p_val,
+                "faithfulness": f_val,
             },
             explanation=(
-                f"recall={r.value:.2f} precision={p.value:.2f} "
-                f"faithfulness={f.value:.2f}"
+                f"recall={r_val:.2f} precision={p_val:.2f} faithfulness={f_val:.2f}"
             ),
         )
 
