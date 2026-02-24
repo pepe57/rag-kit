@@ -115,8 +115,11 @@ class AlbertApiProvider:
                 "No collection ID available. Call upload_documents first."
             )
 
-        # Build the generation prompt
-        prompt = self._build_prompt(num_samples)
+        # Retrieve sample passages from the collection to ground the generation
+        document_context = self._retrieve_document_context()
+
+        # Build the generation prompt with document context
+        prompt = self._build_prompt(num_samples, document_context)
         logger.debug(f"Generation prompt ({len(prompt)} chars):\n{prompt}\n")
 
         # Stream the response from LLM
@@ -183,38 +186,115 @@ class AlbertApiProvider:
         except Exception:
             pass  # Non-critical
 
-    def _build_prompt(self, num_samples: int) -> str:
-        """Build the generation prompt for the LLM."""
-        return f"""⚠️ AUTOMATED CONVERSATION - STRICT OUTPUT FORMAT REQUIRED ⚠️
+    def _retrieve_document_context(self) -> str:
+        """Retrieve sample passages from the collection to ground generation.
 
-This is an automated system that parses your response programmatically.
-You MUST follow the output format exactly - any deviation will break the system.
+        Uses broad searches to get a representative sample of the document's
+        content, which is then included in the prompt to prevent hallucination.
 
-🔴 CRITICAL: GENERATE EXACTLY {num_samples} SAMPLES - NO MORE, NO LESS 🔴
-You MUST generate exactly {num_samples} Question/Answer pairs. Not 3, not {num_samples + 1}, not fewer.
-Output exactly {num_samples} JSON objects, one per line.
+        Returns:
+            A formatted string containing sample passages from the document
+        """
+        if not self.collection_id:
+            return "[Document context not available]"
 
-Requirements:
-- Questions and answers must be in French
-- Each answer must be fully grounded in the document context
-- Ensure diversity - avoid similar questions about the same topics
+        try:
+            import time
 
-🔴 CRITICAL OUTPUT FORMAT 🔴
-Return ONLY valid JSONL with NO additional text, comments, explanations, or preamble.
-Do not output anything before the first JSON object or after the last JSON object.
-Each line must be a complete, valid JSON object with this exact structure:
+            # Small delay to allow document indexing
+            time.sleep(0.5)
+
+            # Use several broad search queries to capture different aspects
+            search_queries = [
+                "principaux points",
+                "concepts clés",
+                "objectifs",
+                "informations",
+                "contenu",
+            ]
+
+            passages = []
+            for query in search_queries:
+                try:
+                    results = self.albert_client.search(
+                        prompt=query,
+                        collections=[self.collection_id],
+                        limit=2,
+                    )
+                    # SearchResponse has a .data attribute
+                    result_list = results.data if hasattr(results, "data") else results
+                    if result_list:
+                        for result in result_list:
+                            # Results can be dicts or objects
+                            text = (
+                                result.get("text", "")
+                                if isinstance(result, dict)
+                                else getattr(result, "text", "")
+                            )
+                            if not text:
+                                text = (
+                                    result.get("content", "")
+                                    if isinstance(result, dict)
+                                    else getattr(result, "content", "")
+                                )
+                            if text and text not in passages:
+                                passages.append(text[:500])  # Limit passage length
+                except Exception as e:
+                    logger.debug(f"Search for '{query}' failed: {e}")
+                    continue
+
+            if passages:
+                context = "\n\n---\n\n".join(passages[:5])  # Max 5 passages
+                return f"Sample passages from the document:\n\n{context}"
+            else:
+                return (
+                    "[Could not retrieve document passages. "
+                    "The LLM will use its general knowledge.]"
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to retrieve document context: {e}")
+            return "[Document context retrieval failed. Proceeding without context.]"
+
+    def _build_prompt(self, num_samples: int, document_context: str) -> str:
+        """Build the generation prompt for the LLM with document context.
+
+        Args:
+            num_samples: Number of Q/A pairs to generate
+            document_context: Sample passages from the document to ground generation
+
+        Returns:
+            The formatted prompt string
+        """
+        return f"""You are helping generate a synthetic evaluation dataset from a document.
+
+DOCUMENT CONTEXT:
+{document_context}
+
+TASK:
+Generate {num_samples} Question/Answer pairs (Q&A) based ONLY on the document context provided above.
+
+REQUIREMENTS:
+- All questions and answers MUST be in French
+- Each answer must be grounded in and directly supported by the document passages shown
+- Create diverse questions covering different aspects of the document
+- For each Q&A pair, include the exact document passage that supports the answer
+
+OUTPUT FORMAT:
+Generate exactly {num_samples} JSON objects, one per line (JSONL format). Each object must have this structure:
 {{
   "user_input": "Question in French?",
-  "retrieved_contexts": ["The exact text passage that answers the question..."],
-  "reference": "The answer in French, fully grounded in the context.",
+  "retrieved_contexts": ["The exact document passage supporting this answer"],
+  "reference": "Answer in French, supported by the context above",
   "_metadata": {{
-    "source_file": "filename.pdf",
-    "quality_score": 0.95,
-    "topic_summary": "Brief topic for diversity tracking"
+    "source_file": "document.pdf",
+    "quality_score": 0.85,
+    "topic_summary": "Brief topic description"
   }}
 }}
 
-NOW OUTPUT EXACTLY {num_samples} JSONL OBJECTS - NO PREAMBLE, NO EXPLANATIONS, NO TEXT BEFORE OR AFTER."""
+Output ONLY the JSON lines with no additional text, explanations, or preamble. Start directly with the first JSON object.
+Generate exactly {num_samples} Q&A pairs."""
 
     def _extract_samples(self, line: str) -> Iterator[GeneratedSample]:
         """Extract JSON sample from a single line."""
