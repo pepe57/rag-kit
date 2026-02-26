@@ -16,6 +16,10 @@ sync:
     uv sync
     uv run pre-commit install
 
+# Interactively upgrade dependencies in pyproject.toml (uses uv-upx)
+upgrade:
+    uvx --from uv-upx uv-upgrade --interactive
+
 # Format code (write changes)
 format:
     moon run tools:format
