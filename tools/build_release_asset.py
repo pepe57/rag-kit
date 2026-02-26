@@ -5,14 +5,14 @@ Generates a standalone Chainlit workspace pre-configured with the `balanced`
 preset and Albert RAG backend, then zips it for upload to a GitHub Release.
 
 Usage:
-    # From repo root (tools/ is a uv sub-workspace):
-    uv run --project tools python tools/build_release_asset.py
+    # From repo root:
+    uv run python tools/build_release_asset.py
 
     # With a specific version tag (default: read from apps/cli/pyproject.toml):
-    uv run --project tools python tools/build_release_asset.py --version v0.17.0
+    uv run python tools/build_release_asset.py --version v0.17.0
 
     # Output directory (default: dist/):
-    uv run --project tools python tools/build_release_asset.py --output dist/
+    uv run python tools/build_release_asset.py --output dist/
 
 Output:
     dist/rag-facile-workspace-v{version}.zip
@@ -55,6 +55,19 @@ def _get_version() -> str:
     return data["project"]["version"]
 
 
+def _get_git_sha() -> str:
+    """Return the current HEAD commit SHA (full, 40 chars)."""
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    return result.stdout.strip()
+
+
 def _render_template(template_path: Path, variables: dict[str, str]) -> str:
     """Simple Tera-style {{ var }} substitution."""
     content = template_path.read_text()
@@ -67,14 +80,16 @@ def _render_template(template_path: Path, variables: dict[str, str]) -> str:
     return content
 
 
-def build_workspace(target_dir: Path, version: str) -> None:
+def build_workspace(target_dir: Path, version: str, git_sha: str) -> None:
     """Generate the workspace tree at target_dir.
 
     Args:
         target_dir: Directory that will become my-rag-app/ in the zip.
         version: Release version tag (e.g. "0.17.0" without "v" prefix).
+        git_sha: Full git SHA of the current HEAD commit, used as the uv
+            source rev so the workspace always tracks the exact code it was
+            built from (rather than a tag that may pre-date recent changes).
     """
-    tag = f"v{version}"
     project_name = WORKSPACE_NAME
     snake_name = project_name.replace("-", "_")
 
@@ -82,10 +97,13 @@ def build_workspace(target_dir: Path, version: str) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # ── pyproject.toml ────────────────────────────────────────────────────────
+    # Pin to the exact commit SHA, not the version tag.
+    # This ensures the workspace always gets the packages that were present when
+    # the zip was built, even if the version tag was created before recent merges.
     uv_sources = (
-        f'rag-facile-lib = {{ git = "{GITHUB_REPO}", tag = "{tag}", subdirectory = "packages/rag-facile-lib" }}\n'
-        f'albert-client = {{ git = "{GITHUB_REPO}", tag = "{tag}", subdirectory = "packages/albert-client" }}\n'
-        f'rag-facile-cli = {{ git = "{GITHUB_REPO}", tag = "{tag}", subdirectory = "apps/cli" }}\n'
+        f'rag-facile-lib = {{ git = "{GITHUB_REPO}", rev = "{git_sha}", subdirectory = "packages/rag-facile-lib" }}\n'
+        f'albert-client = {{ git = "{GITHUB_REPO}", rev = "{git_sha}", subdirectory = "packages/albert-client" }}\n'
+        f'rag-facile-cli = {{ git = "{GITHUB_REPO}", rev = "{git_sha}", subdirectory = "apps/cli" }}\n'
     )
 
     pyproject = f"""\
@@ -373,17 +391,19 @@ def main() -> None:
     else:
         version = _get_version()
 
+    git_sha = _get_git_sha()
     tag = f"v{version}"
     zip_name = f"rag-facile-workspace-{tag}.zip"
     output_path = REPO_ROOT / args.output / zip_name
 
     console.print(
-        f"\n[bold]RAG Facile Release Asset Builder[/bold] — version [cyan]{tag}[/cyan]\n"
+        f"\n[bold]RAG Facile Release Asset Builder[/bold] — version [cyan]{tag}[/cyan] "
+        f"([dim]{git_sha[:8]}[/dim])\n"
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         workspace_dir = Path(tmpdir) / WORKSPACE_NAME
-        build_workspace(workspace_dir, version)
+        build_workspace(workspace_dir, version, git_sha)
         console.print()
         create_zip(workspace_dir, output_path, WORKSPACE_NAME)
 
