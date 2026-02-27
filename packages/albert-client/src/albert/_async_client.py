@@ -198,6 +198,18 @@ class AsyncAlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the API request fails.
+
+        Example:
+            ```python
+            results = await client.search(
+                query="Code civil",
+                collection_ids=[785],
+                limit=5,
+                method="hybrid"
+            )
+            for result in results.data:
+                print(result.score, result.chunk.content)
+            ```
         """
         from albert.types import SearchResponse
 
@@ -365,6 +377,17 @@ class AsyncAlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the upload fails.
+
+        Example:
+            ```python
+            doc = await client.upload_document(
+                file_path="report.pdf",
+                collection_id=123,
+                chunk_size=1000,
+                metadata='{"category": "finance"}'
+            )
+            print(f"Uploaded document ID: {doc.id}")
+            ```
         """
         from pathlib import Path
 
@@ -490,6 +513,21 @@ class AsyncAlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the request fails.
+
+        Example:
+            ```python
+            from albert.types import ChunkInput
+
+            doc = await client.upload_document(
+                file_path="doc.pdf",
+                collection_id=123,
+                disable_chunking=True,
+            )
+            await client.add_chunks(doc.id, [
+                ChunkInput(content="First chunk.", metadata={"page": 1}),
+                ChunkInput(content="Second chunk.", metadata={"page": 2}),
+            ])
+            ```
         """
         body = [chunk.model_dump(exclude_none=True) for chunk in chunks]
         response = await self._make_request(
@@ -506,6 +544,12 @@ class AsyncAlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the chunk doesn't exist or deletion fails.
+
+        Example:
+            ```python
+            await client.delete_chunk(document_id=456, chunk_id=789)
+            print("Chunk 789 from document 456 deleted.")
+            ```
         """
         response = await self._make_request(
             "delete", f"/documents/{document_id}/chunks/{chunk_id}"
@@ -536,6 +580,18 @@ class AsyncAlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the request fails.
+
+        Example:
+            ```python
+            import time
+            now = int(time.time())
+            usage = await client.get_usage(
+                start_time=now - 86400,
+                end_time=now
+            )
+            for record in usage.data:
+                print(f"{record.model}: {record.usage.total_tokens} tokens")
+            ```
         """
         from albert.types import UsageList
 

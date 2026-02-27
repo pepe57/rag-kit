@@ -818,6 +818,12 @@ class AlbertClient:
 
         Raises:
             httpx.HTTPStatusError: If the chunk doesn't exist or deletion fails.
+
+        Example:
+            ```python
+            client.delete_chunk(document_id=456, chunk_id=789)
+            print("Chunk 789 from document 456 deleted.")
+            ```
         """
         response = self._make_request(
             "delete", f"/documents/{document_id}/chunks/{chunk_id}"

@@ -1,5 +1,7 @@
 """Tests for chunks functionality."""
 
+import json
+
 import pytest
 import respx
 from httpx import Response
@@ -213,9 +215,7 @@ class TestAddChunks:
         request_body = mock_route.calls.last.request.content.decode()
         assert "Plain chunk" in request_body
         # metadata key should be excluded when None (exclude_none=True in model_dump)
-        # Note: we parse the JSON to avoid substring false positives
-        import json
-
+        # Parse JSON to avoid substring false positives from the chunk content itself
         parsed = json.loads(request_body)
         assert "metadata" not in parsed[0]
 
