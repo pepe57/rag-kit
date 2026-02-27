@@ -184,11 +184,11 @@ class AlbertPipeline(RAGPipeline):
         # When collection_ids is explicitly passed (even empty), honour the
         # caller's intent (e.g. user disabled all public collections in the UI).
         # When not passed (None), fall back to config defaults.
-        collection_ids: list[int | str] | None = kwargs.get("collection_ids")  # type: ignore[assignment]
+        collection_ids: list[int] | None = kwargs.get("collection_ids")  # type: ignore[assignment]
         initial = (
             config.storage.collections if collection_ids is None else collection_ids
         )
-        ids: set[int | str] = set(initial)
+        ids: set[int] = set(initial)
 
         # Always include the auto-managed session collection if one exists
         if self._collection_id is not None:

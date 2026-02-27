@@ -37,7 +37,7 @@ def _search_result_to_chunk(result) -> RetrievedChunk:
 def search_chunks(
     client: AlbertClient,
     query: str,
-    collection_ids: list[int | str],
+    collection_ids: list[int],
     *,
     limit: int = 10,
     method: str = "hybrid",
@@ -61,8 +61,8 @@ def search_chunks(
     effective_threshold = score_threshold if method == "semantic" else None
 
     response = client.search(
-        prompt=query,
-        collections=collection_ids,
+        query=query,
+        collection_ids=collection_ids,
         limit=limit,
         method=method,
         score_threshold=effective_threshold,
