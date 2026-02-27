@@ -85,15 +85,7 @@ git -C main branch --set-upstream-to=origin/main main
 cd main && uv sync
 
 # 9. Create your .env from the example and fill in your API key
-cp main/.env.example main/.env
-```
-
-Then configure worktrunk to place new worktrees in `.worktrees/`:
-
-```toml
-# ~/.config/worktrunk/config.toml
-[projects."github.com/etalab-ia/rag-facile"]
-worktree-path = "../.worktrees/{{ branch | sanitize }}"
+cp .env.example .env
 ```
 
 ---
