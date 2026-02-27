@@ -10,6 +10,3 @@
 
 # Agent memory & config
 .rag-facile
-
-# Moon build cache (speeds up repeated tasks)
-.moon/cache
