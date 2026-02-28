@@ -61,7 +61,6 @@ exclude = [
     "apps/reflex-chat",
     "apps/cli/tests",
     "packages/evaluation/tests",
-    "packages/pipelines",
     "packages/tracing",
 ]
 

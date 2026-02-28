@@ -15,81 +15,50 @@ logger = logging.getLogger(__name__)
 def _call_pipeline(question: str) -> tuple[str, list[str]]:
     """Call the RAG pipeline and return formatted context + individual chunk texts.
 
+    Uses :meth:`~rag_facile.pipelines.RAGPipeline.retrieve_chunks` to fetch
+    chunks in a single Albert API call, then formats them locally via
+    :func:`~rag_facile.context.format_context`.  This avoids the double-search
+    that would result from calling ``process_query`` (search + rerank + format)
+    and then re-running the search separately to extract chunk texts.
+
+    ``BasicPipeline.retrieve_chunks`` returns ``[]``, so pipelines without
+    chunk-level retrieval produce an empty chunk list — retrieval metrics will
+    be vacuously true, which is the correct behaviour (no chunks to measure).
+
     Returns:
         tuple of (formatted_context, list_of_chunk_texts)
 
-        - formatted_context: joined, citation-annotated string for injection into
-          the LLM prompt (produced by ``process_query``).
-        - list_of_chunk_texts: individual passage texts after search + rerank,
-          stored in ``state.metadata["retrieved_contexts"]`` for the
-          ``context_recall`` and ``context_precision`` scorers.
+        - formatted_context: citation-annotated string for injection into the
+          LLM prompt (identical output to ``process_query``).
+        - list_of_chunk_texts: individual passage texts stored in
+          ``state.metadata["retrieved_contexts"]`` for the ``context_recall``
+          and ``context_precision`` scorers.
 
     Extracted as a module-level helper so tests can patch it cleanly.
     """
+    from rag_facile.context import format_context
     from rag_facile.core import get_config
     from rag_facile.pipelines import get_pipeline
-    from rag_facile.pipelines.albert import AlbertPipeline
-    from rag_facile.retrieval import search_chunks
 
     config = get_config()
     pipeline = get_pipeline(config)
 
-    # Formatted context for the LLM prompt
-    context = pipeline.process_query(question)
+    # Single Albert API call: search → optional rerank → chunks
+    chunks = pipeline.retrieve_chunks(question)
 
-    # Re-run search + rerank to capture individual chunk texts.
-    # process_query doesn't expose them, so we replicate the same call.
-    # Only AlbertPipeline has a live client and session collection.
-    if not isinstance(pipeline, AlbertPipeline):
-        return context, []
-
-    try:
-        from rag_facile.reranking import rerank_chunks
-
-        collection_ids: list[int | str] = list(config.storage.collections)
-        if pipeline._collection_id is not None:
-            collection_ids = list(set(collection_ids) | {pipeline._collection_id})
-
-        if not collection_ids:
-            return context, []
-
-        client = pipeline.client
-        chunks = search_chunks(
-            client,
-            question,
-            collection_ids,
-            limit=config.retrieval.top_k,
-            method=config.retrieval.strategy,
-            score_threshold=config.retrieval.score_threshold,
-        )
-
-        final_chunks = chunks
-        if config.reranking.enabled:
-            final_chunks = rerank_chunks(
-                client,
-                question,
-                chunks,
-                model=config.reranking.model,
-                top_n=config.reranking.top_n,
-            )
-
-        chunk_texts = [
-            chunk.get("content", "") for chunk in final_chunks if chunk.get("content")
-        ]
-        return context, chunk_texts
-
-    except (OSError, RuntimeError):
-        logger.warning("Failed to extract chunk texts from search", exc_info=True)
-        return context, []
+    # Format context locally — same output as process_query, zero extra API calls
+    context = format_context(chunks) if chunks else ""
+    chunk_texts = [c.get("content", "") for c in chunks if c.get("content")]
+    return context, chunk_texts
 
 
 @solver
 def retrieve_rag_context() -> Solver:
     """Run the RAG pipeline and inject retrieved context into the prompt.
 
-    Calls ``AlbertPipeline.process_query()`` using the collections configured
-    in ``ragfacile.toml``.  The retrieved context is injected as a prefix to
-    the user message.
+    Calls :meth:`~rag_facile.pipelines.RAGPipeline.retrieve_chunks` using the
+    collections configured in ``ragfacile.toml``.  The retrieved context is
+    formatted and injected as a prefix to the user message.
 
     Two metadata keys are written for the scorers:
 
@@ -99,7 +68,7 @@ def retrieve_rag_context() -> Solver:
     - The dataset's ``relevant_contexts`` are left untouched so scorers can
       compare retrieved vs relevant.
 
-    If the pipeline returns no context (no collections configured, or no
+    If the pipeline returns no chunks (no collections configured, or no
     relevant chunks found), the dataset's pre-computed values are kept and the
     prompt is passed through unchanged.
     """
@@ -108,7 +77,7 @@ def retrieve_rag_context() -> Solver:
         question = state.input_text
 
         try:
-            # process_query is synchronous — run in a thread to avoid blocking
+            # retrieve_chunks is synchronous — run in a thread to avoid blocking
             # the Inspect AI event loop.
             loop = asyncio.get_event_loop()
             context, chunk_texts = await loop.run_in_executor(
