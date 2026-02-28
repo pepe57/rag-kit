@@ -79,7 +79,7 @@ def retrieve_rag_context() -> Solver:
         try:
             # retrieve_chunks is synchronous — run in a thread to avoid blocking
             # the Inspect AI event loop.
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             context, chunk_texts = await loop.run_in_executor(
                 None, _call_pipeline, question
             )
@@ -93,13 +93,25 @@ def retrieve_rag_context() -> Solver:
             # chunk_texts are individual passage texts for recall/precision scoring.
             state.metadata["retrieved_contexts"] = chunk_texts
 
-        augmented = (
-            "Use the following context to answer the question. "
-            "Only use information from the context. "
-            "If the context does not contain the answer, say so.\n\n"
-            f"## Context\n{context}\n\n"
-            f"## Question\n{question}"
-        )
+        # NOTE: The RAG instruction below is intentionally in English.
+        # TODO(i18n): Consider localising to French to match production chat apps,
+        # where context injection uses French instructions. Raise with data scientists
+        # before changing — it may affect score comparability across eval runs.
+        #
+        # NOTE(eval): format_context() adds citation markers ([1], source: file.pdf)
+        # to the context injected here, which were absent during dataset generation.
+        # This is a known minor inconsistency. Gather data scientist feedback before
+        # deciding whether to strip citations for eval or align dataset generation.
+        if context:
+            augmented = (
+                "Use the following context to answer the question. "
+                "Only use information from the context. "
+                "If the context does not contain the answer, say so.\n\n"
+                f"## Context\n{context}\n\n"
+                f"## Question\n{question}"
+            )
+        else:
+            augmented = f"## Question\n{question}"
         state.messages = [
             ChatMessageUser(content=augmented),
             *state.messages[1:],
