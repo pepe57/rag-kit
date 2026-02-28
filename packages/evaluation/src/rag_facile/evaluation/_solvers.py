@@ -28,6 +28,7 @@ def _call_pipeline(question: str) -> tuple[str, list[str]]:
     """
     from rag_facile.core import get_config
     from rag_facile.pipelines import get_pipeline
+    from rag_facile.pipelines.albert import AlbertPipeline
     from rag_facile.retrieval import search_chunks
 
     config = get_config()
@@ -38,45 +39,48 @@ def _call_pipeline(question: str) -> tuple[str, list[str]]:
 
     # Re-run search + rerank to capture individual chunk texts.
     # process_query doesn't expose them, so we replicate the same call.
+    # Only AlbertPipeline has a live client and session collection.
+    if not isinstance(pipeline, AlbertPipeline):
+        return context, []
+
     try:
         from rag_facile.reranking import rerank_chunks
 
-        collection_ids = list(config.storage.collections)
-        if pipeline._collection_id:
+        collection_ids: list[int | str] = list(config.storage.collections)
+        if pipeline._collection_id is not None:
             collection_ids = list(set(collection_ids) | {pipeline._collection_id})
 
-        if collection_ids:
-            client = pipeline.client
-            chunks = search_chunks(
+        if not collection_ids:
+            return context, []
+
+        client = pipeline.client
+        chunks = search_chunks(
+            client,
+            question,
+            collection_ids,
+            limit=config.retrieval.top_k,
+            method=config.retrieval.strategy,
+            score_threshold=config.retrieval.score_threshold,
+        )
+
+        final_chunks = chunks
+        if config.reranking.enabled:
+            final_chunks = rerank_chunks(
                 client,
                 question,
-                collection_ids,
-                limit=config.retrieval.top_k,
-                method=config.retrieval.strategy,
-                score_threshold=config.retrieval.score_threshold,
+                chunks,
+                model=config.reranking.model,
+                top_n=config.reranking.top_n,
             )
 
-            final_chunks = chunks
-            if config.reranking.enabled:
-                final_chunks = rerank_chunks(
-                    client,
-                    question,
-                    chunks,
-                    model=config.reranking.model,
-                    top_n=config.reranking.top_n,
-                )
+        chunk_texts = [
+            chunk.get("content", "") for chunk in final_chunks if chunk.get("content")
+        ]
+        return context, chunk_texts
 
-            chunk_texts = [
-                chunk.get("content", "")
-                for chunk in final_chunks
-                if chunk.get("content")
-            ]
-            return context, chunk_texts
-
-    except Exception:
+    except (OSError, RuntimeError):
         logger.warning("Failed to extract chunk texts from search", exc_info=True)
-
-    return context, []
+        return context, []
 
 
 @solver
@@ -110,7 +114,7 @@ def retrieve_rag_context() -> Solver:
             context, chunk_texts = await loop.run_in_executor(
                 None, _call_pipeline, question
             )
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             logger.warning("RAG pipeline retrieval failed", exc_info=True)
             context = ""
             chunk_texts = []

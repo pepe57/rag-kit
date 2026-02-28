@@ -32,7 +32,11 @@ def test_load_basic_dataset(tmp_path: Path) -> None:
     assert len(ds) == 1
     assert ds[0].input == "What is RAG?"
     assert ds[0].target == "Retrieval-Augmented Generation"
+    # retrieved_contexts from JSONL → both metadata keys
     assert ds[0].metadata["retrieved_contexts"] == [
+        "RAG combines retrieval with generation."
+    ]
+    assert ds[0].metadata["relevant_contexts"] == [
         "RAG combines retrieval with generation."
     ]
 

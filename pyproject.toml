@@ -60,9 +60,9 @@ exclude = [
     "apps/chainlit-chat/app.py",
     "apps/reflex-chat",
     "apps/cli/tests",
+    "packages/evaluation/tests",
     "packages/pipelines",
     "packages/tracing",
-    "packages/evaluation",
 ]
 
 [tool.ty.rules]
