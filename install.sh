@@ -158,6 +158,30 @@ cd "$WORKSPACE_DIR"
 uv sync
 cd - >/dev/null
 
+# ── 5.5. Configure API key ────────────────────────────────────────────────────
+
+ENV_WRITTEN=false
+if [[ -f "$WORKSPACE_DIR/.env" ]]; then
+    echo "✓ Fichier .env déjà présent — clé API conservée"
+elif [[ -r /dev/tty ]]; then
+    echo ""
+    echo "==> Configuration de la clé API Albert"
+    echo "   Obtenez votre clé sur : https://albert.api.etalab.gouv.fr/"
+    echo ""
+    printf "   Entrez votre clé API (ou appuyez sur Entrée pour ignorer) : "
+    if read -r -s ALBERT_API_KEY </dev/tty 2>/dev/null; then
+        echo ""
+        if [[ -n "$ALBERT_API_KEY" ]]; then
+            sed "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=$ALBERT_API_KEY|" \
+                "$WORKSPACE_DIR/.env.example" > "$WORKSPACE_DIR/.env"
+            echo "✓ Fichier .env créé avec votre clé API"
+            ENV_WRITTEN=true
+        else
+            echo "   (ignoré — vous pourrez configurer la clé plus tard)"
+        fi
+    fi
+fi
+
 # ── 6. Terminé ────────────────────────────────────────────────────────────────
 
 echo ""
@@ -165,16 +189,38 @@ echo "✅ RAG Facile est prêt !"
 echo ""
 echo "Prochaines étapes :"
 echo ""
-echo "  1. Ajoutez votre clé API Albert :"
-echo "       cd $WORKSPACE_DIR"
-echo "       cp .env.template .env"
-echo "       # Modifiez .env et définissez OPENAI_API_KEY=<votre-clé>"
-echo "       # Obtenez une clé sur : https://albert.sites.beta.gouv.fr/"
-echo ""
-echo "  2. Lancez votre application :"
-echo "       cd $WORKSPACE_DIR && just run"
-echo ""
-cat <<EOF
+if [[ "$ENV_WRITTEN" == "true" ]]; then
+    echo "  1. Lancez votre application :"
+    echo "       cd $WORKSPACE_DIR && just run"
+    echo ""
+    cat <<EOF
+  2. Apprenez, explorez et configurez avec votre assistant IA :
+       cd $WORKSPACE_DIR && just learn
+
+     Votre assistant peut vous aider à :
+       • Comprendre le projet que vous venez d'installer
+       • Apprendre les concepts RAG
+       • Configurer votre application
+
+  3. Vous découvrez les assistants conversationnels basés sur le RAG ?
+     Le guide officiel de la DINUM vous accompagne pas à pas,
+     de l'investigation jusqu'à la mise en production — conçu pour
+     les porteurs de projet, chefs de projet et équipes non-expertes.
+
+     👉  https://docs.numerique.gouv.fr/docs/6bd3ca79-9cb9-4603-866a-6fa1788d2c8e/
+
+EOF
+else
+    echo "  1. Ajoutez votre clé API Albert :"
+    echo "       cd $WORKSPACE_DIR"
+    echo "       cp .env.example .env"
+    echo "       # Modifiez .env et définissez OPENAI_API_KEY=<votre-clé>"
+    echo "       # Obtenez une clé sur : https://albert.api.etalab.gouv.fr/"
+    echo ""
+    echo "  2. Lancez votre application :"
+    echo "       cd $WORKSPACE_DIR && just run"
+    echo ""
+    cat <<EOF
   3. Apprenez, explorez et configurez avec votre assistant IA :
        cd $WORKSPACE_DIR && just learn
 
@@ -191,6 +237,7 @@ cat <<EOF
      👉  https://docs.numerique.gouv.fr/docs/6bd3ca79-9cb9-4603-866a-6fa1788d2c8e/
 
 EOF
+fi
 
 # Guidance for shell profiles (so just/uv are found after terminal restart)
 if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
