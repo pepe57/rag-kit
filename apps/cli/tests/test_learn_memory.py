@@ -14,7 +14,7 @@ from cli.commands.learn.memory import (
 @pytest.fixture()
 def workspace(tmp_path):
     """Minimal workspace with profile.md."""
-    agent_dir = tmp_path / ".rag-facile" / "agent"
+    agent_dir = tmp_path / ".agent"
     agent_dir.mkdir(parents=True)
 
     (agent_dir / "profile.md").write_text(
@@ -54,7 +54,7 @@ class TestIncrementSessionCount:
 
     def test_updates_file(self, workspace):
         increment_session_count(workspace)
-        profile = (workspace / ".rag-facile/agent/profile.md").read_text()
+        profile = (workspace / ".agent/profile.md").read_text()
         assert "## Session Count\n1" in profile
 
     def test_increments_twice(self, workspace):

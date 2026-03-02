@@ -1,6 +1,6 @@
 """First-run initialization wizard for the rag-facile chat assistant.
 
-Called automatically by start_chat() when .rag-facile/ is absent from the workspace.
+Called automatically by start_chat() when .agent/ is absent from the workspace.
 Creates the directory structure and profile file that the agent uses
 to personalise responses across sessions.
 """
@@ -18,9 +18,9 @@ console = Console()
 
 # ── Directory / file layout ───────────────────────────────────────────────────
 
-_AGENT_DIR = Path(".rag-facile") / "agent"
+_AGENT_DIR = Path(".agent")
 _PROFILE_FILE = _AGENT_DIR / "profile.md"
-_SKILLS_DIR = Path(".rag-facile") / "skills"
+_SKILLS_DIR = Path(".agents") / "skills"
 
 # ── Questionary style (matches setup.py palette) ─────────────────────────────
 
@@ -74,10 +74,10 @@ def _profile_template(experience: str, language: str) -> str:
 
 
 def _git_add(workspace: Path) -> None:
-    """Stage .rag-facile/ in the workspace git repo (best-effort)."""
+    """Stage .agent/ in the workspace git repo (best-effort)."""
     try:
         subprocess.run(
-            ["git", "add", ".rag-facile/"],
+            ["git", "add", ".agent/"],
             cwd=workspace,
             check=True,
             capture_output=True,
@@ -86,7 +86,7 @@ def _git_add(workspace: Path) -> None:
         pass  # git not installed — silently skip
     except subprocess.CalledProcessError as exc:
         console.print(
-            f"[dim yellow]⚠ git add .rag-facile/ failed: {exc.stderr.decode().strip()}[/dim yellow]"
+            f"[dim yellow]⚠ git add .agent/ failed: {exc.stderr.decode().strip()}[/dim yellow]"
         )
 
 
@@ -94,7 +94,7 @@ def _git_add(workspace: Path) -> None:
 
 
 def needs_init(workspace: Path) -> bool:
-    """Return True if the workspace has no .rag-facile/agent/ directory yet."""
+    """Return True if the workspace has no .agent/ directory yet."""
     return not (workspace / _AGENT_DIR).exists()
 
 
@@ -111,7 +111,7 @@ def read_language(workspace: Path) -> str:
 
 
 def run_init_wizard(workspace: Path) -> str:
-    """Run the first-time setup wizard and create .rag-facile/ in the workspace.
+    """Run the first-time setup wizard and create .agent/ in the workspace.
 
     Idempotent if the directory already exists (guarded by needs_init()).
     Uses questionary for interactive prompts; falls back to defaults in

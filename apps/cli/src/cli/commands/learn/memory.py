@@ -11,7 +11,7 @@ from pathlib import Path
 
 # ── File paths (mirrors init.py layout) ──────────────────────────────────────
 
-_AGENT_DIR = Path(".rag-facile") / "agent"
+_AGENT_DIR = Path(".agent")
 _PROFILE_FILE = _AGENT_DIR / "profile.md"
 
 
