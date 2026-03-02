@@ -165,9 +165,9 @@ if (Test-Path $EnvPath) {
     $SecureKey = Read-Host -Prompt "   Entrez votre cle API (ou appuyez sur Entree pour ignorer)" -AsSecureString
     $AlbertKey = [System.Net.NetworkCredential]::new('', $SecureKey).Password
     if (-not [string]::IsNullOrEmpty($AlbertKey)) {
-        (Get-Content "$WorkspaceDir\.env.example") `
-            -replace 'OPENAI_API_KEY=.*', "OPENAI_API_KEY=$AlbertKey" |
-            Set-Content $EnvPath -Encoding UTF8
+        (Get-Content "$WorkspaceDir\.env.example") | ForEach-Object {
+            if ($_ -match '^OPENAI_API_KEY=') { "OPENAI_API_KEY=$AlbertKey" } else { $_ }
+        } | Set-Content $EnvPath -Encoding UTF8
         Write-Host "OK Fichier .env cree avec votre cle API" -ForegroundColor Green
         $EnvWritten = $true
     } else {

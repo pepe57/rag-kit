@@ -172,7 +172,8 @@ elif [[ -r /dev/tty ]]; then
     if read -r -s ALBERT_API_KEY </dev/tty 2>/dev/null; then
         echo ""
         if [[ -n "$ALBERT_API_KEY" ]]; then
-            sed "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=$ALBERT_API_KEY|" \
+            awk -v key="$ALBERT_API_KEY" \
+                '/^OPENAI_API_KEY=/ {print "OPENAI_API_KEY=" key; next} {print}' \
                 "$WORKSPACE_DIR/.env.example" > "$WORKSPACE_DIR/.env"
             echo "✓ Fichier .env créé avec votre clé API"
             ENV_WRITTEN=true
