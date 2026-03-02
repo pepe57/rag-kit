@@ -283,8 +283,10 @@ def _finalize(
         from rag_facile.memory.lifecycle import finalize_session
 
         finalize_session(workspace, session_turns, session_start)
-    except Exception:  # noqa: BLE001 — session finalization must never crash the CLI
-        pass
+    except Exception as exc:  # noqa: BLE001 — session finalization must never crash the CLI
+        import logging
+
+        logging.warning("Session finalization failed: %s", exc)
 
 
 def start_chat(debug: bool = False) -> None:

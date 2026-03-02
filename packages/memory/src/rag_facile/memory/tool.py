@@ -56,14 +56,14 @@ def _safe_resolve(path_str: str, agent_dir: Path) -> Path:
 # ── Auto-bootstrap ────────────────────────────────────────────────────────────
 
 
-def _ensure_memory_file(agent_dir: Path) -> None:
+def _ensure_memory_file(workspace_root: Path) -> None:
     """Create ``MEMORY.md`` from the template if it doesn't exist yet."""
-    memory_path = agent_dir / "MEMORY.md"
+    memory_path = workspace_root / AGENT_DIR / "MEMORY.md"
     if memory_path.exists():
         return
     from rag_facile.memory.stores import SemanticStore
 
-    SemanticStore.create(_workspace_root)  # type: ignore[arg-type]
+    SemanticStore.create(workspace_root)
 
 
 # ── Directory listing ─────────────────────────────────────────────────────────
@@ -184,7 +184,8 @@ def memory_read(path: str) -> str:
     if not resolved.exists():
         # Auto-bootstrap: if reading root or MEMORY.md, try to create it
         if path_str in (".", "", "MEMORY.md"):
-            _ensure_memory_file(agent)
+            assert _workspace_root is not None  # guaranteed by _agent_dir() check
+            _ensure_memory_file(_workspace_root)
             if not resolved.exists():
                 return f"File not found: {path_str}"
         else:

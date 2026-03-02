@@ -154,9 +154,12 @@ def increment_session_count(workspace: Path) -> int:
     if match:
         new_count = int(match.group(2)) + 1
         content = content[: match.start(2)] + str(new_count) + content[match.end(2) :]
-        profile_file.write_text(content, encoding="utf-8")
-        return new_count
-    return 1
+    else:
+        new_count = 1
+        content = f"{content.rstrip()}\n\n## Session Count\n{new_count}"
+
+    profile_file.write_text(content, encoding="utf-8")
+    return new_count
 
 
 # ── Git ───────────────────────────────────────────────────────────────────────

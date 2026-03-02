@@ -4,11 +4,11 @@ Flat-file persistent memory for the rag-facile chat agent.
 
 ## Architecture
 
-All state is stored as plain Markdown files under `.rag-facile/agent/`:
+All state is stored as plain Markdown files under `.agent/`:
 
 ```
-.rag-facile/agent/
-├── memory.md           # Semantic store — curated facts with fixed sections
+.agent/
+├── MEMORY.md           # Semantic store — curated facts with fixed sections
 ├── profile.md          # User profile (language, experience, session count)
 ├── logs/
 │   └── YYYY-MM-DD.md   # Episodic logs — append-only daily transcripts
@@ -16,13 +16,15 @@ All state is stored as plain Markdown files under `.rag-facile/agent/`:
     └── *.md            # Session snapshots — archived full transcripts
 ```
 
-## Retrieval
+## Agent Tools
 
-Search uses pure Python `re` + `glob` (no SQLite, no embeddings). The agent
-has two tools:
+The agent interacts with memory through three standard file-operation tools:
 
-- `grep_memory(query)` — keyword search across all `.md` files
-- `read_memory_lines(file, start, end)` — read context around a hit
+- `memory_read(path)` — list directories, read files with line numbers/ranges, auto-bootstrap `MEMORY.md`
+- `memory_write(path, content)` — create or overwrite files, auto-create parent dirs
+- `memory_edit(path, old, new)` — exact string replacement with uniqueness guard
+
+All paths are relative to `.agent/` and protected against traversal (`..`, absolute paths).
 
 ## Dependencies
 
