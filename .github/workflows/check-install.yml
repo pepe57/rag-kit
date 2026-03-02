@@ -62,6 +62,9 @@ jobs:
         run: uv sync
 
       - name: Build release asset
+        env:
+          # Use the real branch HEAD, not the ephemeral PR merge commit
+          BUILD_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: uv run python tools/build_release_asset.py
 
       - name: Upload asset as workflow artifact
@@ -92,6 +95,8 @@ jobs:
 
       - name: Run installer (using local asset)
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ASSET=$(ls /tmp/assets/rag-facile-workspace-*.zip | head -1)
           RAG_FACILE_LOCAL_ASSET="$ASSET" bash install.sh
@@ -164,6 +169,8 @@ jobs:
 
       - name: Run installer (using local asset)
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ASSET=$(ls /tmp/assets/rag-facile-workspace-*.zip | head -1)
           RAG_FACILE_LOCAL_ASSET="$ASSET" bash install.sh
@@ -235,6 +242,8 @@ jobs:
 
       - name: Run PowerShell installer (using local asset)
         shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $Asset = Get-ChildItem "C:\Temp\assets\rag-facile-workspace-*.zip" | Select-Object -First 1
           $env:RAG_FACILE_LOCAL_ASSET = $Asset.FullName
