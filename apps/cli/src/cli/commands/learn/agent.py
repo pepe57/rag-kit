@@ -5,6 +5,7 @@ Entry point: start_chat() — called when the user runs `rag-facile learn`.
 
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 
 import openai
@@ -17,7 +18,6 @@ from smolagents.monitoring import LogLevel
 from smolagents.utils import AgentError, AgentMaxStepsError
 
 from cli.commands.learn._console import console
-
 from cli.commands.learn.init import needs_init, read_language, run_init_wizard
 from cli.commands.learn.skills import (
     discover_skills,
@@ -25,15 +25,15 @@ from cli.commands.learn.skills import (
     install_skill,
     load_skill,
 )
-from cli.commands.learn.memory import (
-    increment_session_count,
-    load_context,
-)
 from cli.commands.learn.tools import (
+    _set_memory_workspace,
     activate_skill,
     get_agents_md,
     get_docs,
     get_recent_git_activity,
+    memory_edit,
+    memory_read,
+    memory_write,
     run_rag_facile,
     set_available_skills,
     set_workspace_root,
@@ -86,6 +86,27 @@ DO NOT use if the user is merely asking about skills or how they work.
 
 Only activate ONE skill per session. If no skill clearly fits, respond directly in \
 natural language — this is always a valid choice.
+
+## Memory — persistent file storage
+
+You have a memory directory (.agent/) that persists across sessions.
+
+IMPORTANT: ALWAYS read your memory directory before doing anything else. \
+Use memory_read(".") to see what files exist from previous sessions.
+
+MEMORY PROTOCOL:
+1. memory_read(".")          → check your memory directory
+2. memory_read("MEMORY.md")  → read your curated facts
+3. Work on the user's task
+4. memory_write() or memory_edit() → save important facts proactively
+
+ASSUME INTERRUPTION: Your context window might be reset at any moment. \
+Record progress to memory so future sessions can pick up where you left off.
+
+Keep memory organized: use memory_edit() to update existing facts. \
+Use memory_write() to create or overwrite entire files. \
+Available memory sections in MEMORY.md: \
+User Identity, Preferences, Project State, Key Facts, Routing Table, Recent Context.
 
 ## RULE — Always use tools; never answer from memory
 
@@ -250,6 +271,24 @@ def _build_model() -> OpenAIServerModel:
     )
 
 
+def _finalize(
+    workspace: Path | None,
+    session_turns: list[dict[str, str]],
+    session_start: datetime,
+) -> None:
+    """End-of-session housekeeping (best-effort, never raises)."""
+    if not workspace or not session_turns:
+        return
+    try:
+        from rag_facile.memory.lifecycle import finalize_session
+
+        finalize_session(workspace, session_turns, session_start)
+    except Exception as exc:  # noqa: BLE001 — session finalization must never crash the CLI
+        import logging
+
+        logging.warning("Session finalization failed: %s", exc)
+
+
 def start_chat(debug: bool = False) -> None:
     """Launch the interactive RAG assistant chat loop."""
     # Detect workspace — walk up from cwd for ragfacile.toml
@@ -258,7 +297,8 @@ def start_chat(debug: bool = False) -> None:
     if workspace:
         load_dotenv(workspace / ".env")  # load API key + config from project .env
         set_workspace_root(workspace)
-        # First-run: initialise .rag-facile/ and capture chosen language
+        _set_memory_workspace(workspace)
+        # First-run: initialise .agent/ and capture chosen language
         if needs_init(workspace):
             language = run_init_wizard(workspace)
         else:
@@ -269,11 +309,19 @@ def start_chat(debug: bool = False) -> None:
     # Load persistent memory — injected into the first user turn (not system prompt)
     # so the model pays full attention to it rather than losing it at the end of
     # smolagents' long built-in system prompt.
-    profile_context = load_context(workspace) if workspace else ""
+    from rag_facile.memory.context import bootstrap_context
+    from rag_facile.memory.stores import EpisodicLog, SemanticStore
 
-    # Increment session count (best-effort — workspace may be None)
-    if workspace:
-        increment_session_count(workspace)
+    profile_context = bootstrap_context(workspace) if workspace else ""
+
+    # Ensure MEMORY.md exists (creates from template on first session)
+    if workspace and not (workspace / ".agent" / "MEMORY.md").exists():
+        SemanticStore.create(workspace)
+
+    # Session state — used by lifecycle hooks
+    session_turns: list[dict[str, str]] = []
+    session_start = datetime.now()  # noqa: DTZ005 — local time is intentional
+    turn_count = 0
 
     # Discover skills: built-in + workspace (.agents/skills/)
     available_skills = discover_skills(workspace)
@@ -316,6 +364,9 @@ def start_chat(debug: bool = False) -> None:
             get_recent_git_activity,
             get_docs,
             run_rag_facile,
+            memory_read,
+            memory_write,
+            memory_edit,
         ]
     ] + [_wrap_activate_skill(activate_skill)]
 
@@ -349,6 +400,7 @@ def start_chat(debug: bool = False) -> None:
             user_input = console.input(f"[bold cyan]{ui['you']}[/bold cyan]: ").strip()
         except (KeyboardInterrupt, EOFError):
             console.print(f"\n[dim]{ui['goodbye']}[/dim]")
+            _finalize(workspace, session_turns, session_start)
             break
 
         if not user_input:
@@ -356,6 +408,7 @@ def start_chat(debug: bool = False) -> None:
 
         if user_input.lower() in ("q", "quit", "exit", "bye", "au revoir", "quitter"):
             console.print(f"[dim]{ui['goodbye']}[/dim]")
+            _finalize(workspace, session_turns, session_start)
             break
 
         # ── /skills slash commands ────────────────────────────────────────────
@@ -418,6 +471,12 @@ def start_chat(debug: bool = False) -> None:
         # Skill activation is handled by the agent itself via the activate_skill tool.
         # No keyword auto-detection here — the LLM picks the right skill semantically.
 
+        # Episodic logging — record user turn
+        if workspace:
+            EpisodicLog.append_turn(workspace, "user", user_input)
+        session_turns.append({"role": "user", "content": user_input})
+        turn_count += 1
+
         # Build effective_input — layer memory (first turn) + skill (on load) + message
         effective_input = user_input
 
@@ -472,6 +531,21 @@ def start_chat(debug: bool = False) -> None:
         if response is None:
             continue
 
+        response_text = str(response)
+
+        # Episodic logging — record assistant turn
+        if workspace:
+            EpisodicLog.append_turn(workspace, "assistant", response_text)
+        session_turns.append({"role": "assistant", "content": response_text})
+        turn_count += 1
+
+        # Mid-session checkpoint every 8 turns
+        if workspace:
+            from rag_facile.memory.lifecycle import run_checkpoint, should_checkpoint
+
+            if should_checkpoint(turn_count):
+                run_checkpoint(workspace, session_turns[-8:])
+
         console.print("[bold green]Assistant[/bold green]:")
-        console.print(Markdown(str(response)))
+        console.print(Markdown(response_text))
         console.print()

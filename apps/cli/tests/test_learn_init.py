@@ -21,7 +21,7 @@ class TestNeedsInit:
         assert needs_init(tmp_path) is True
 
     def test_returns_false_when_agent_dir_exists(self, tmp_path):
-        (tmp_path / ".rag-facile" / "agent").mkdir(parents=True)
+        (tmp_path / ".agent").mkdir(parents=True)
         assert needs_init(tmp_path) is False
 
 
@@ -41,15 +41,15 @@ class TestReadLanguage:
         assert read_language(tmp_path) == "fr"
 
     def test_reads_language_from_profile(self, tmp_path):
-        (tmp_path / ".rag-facile" / "agent").mkdir(parents=True)
-        (tmp_path / ".rag-facile" / "agent" / "profile.md").write_text(
+        (tmp_path / ".agent").mkdir(parents=True)
+        (tmp_path / ".agent" / "profile.md").write_text(
             "## Preferences\n- Language: en\n", encoding="utf-8"
         )
         assert read_language(tmp_path) == "en"
 
     def test_returns_fr_as_default_when_language_line_absent(self, tmp_path):
-        (tmp_path / ".rag-facile" / "agent").mkdir(parents=True)
-        (tmp_path / ".rag-facile" / "agent" / "profile.md").write_text(
+        (tmp_path / ".agent").mkdir(parents=True)
+        (tmp_path / ".agent" / "profile.md").write_text(
             "## Preferences\n", encoding="utf-8"
         )
         assert read_language(tmp_path) == "fr"
@@ -82,7 +82,7 @@ class TestRunInitWizard:
         ):
             run_init_wizard(tmp_path)
 
-        assert (tmp_path / ".rag-facile" / "agent" / "profile.md").exists()
+        assert (tmp_path / ".agent" / "profile.md").exists()
 
     def test_returns_selected_language(self, tmp_path):
         with (
@@ -105,7 +105,7 @@ class TestRunInitWizard:
         ):
             run_init_wizard(tmp_path)
 
-        assert (tmp_path / ".rag-facile" / "skills").is_dir()
+        assert (tmp_path / ".agents" / "skills").is_dir()
 
     def test_experience_reflected_in_profile(self, tmp_path):
         with (
@@ -120,7 +120,7 @@ class TestRunInitWizard:
         ):
             run_init_wizard(tmp_path)
 
-        profile = (tmp_path / ".rag-facile" / "agent" / "profile.md").read_text()
+        profile = (tmp_path / ".agent" / "profile.md").read_text()
         assert "Expert" in profile
 
     def test_falls_back_to_defaults_on_non_interactive(self, tmp_path):
@@ -134,7 +134,7 @@ class TestRunInitWizard:
         ):
             run_init_wizard(tmp_path)  # should not raise
 
-        assert (tmp_path / ".rag-facile" / "agent" / "profile.md").exists()
+        assert (tmp_path / ".agent" / "profile.md").exists()
 
     def test_git_add_called_for_workspace_git(self, tmp_path):
         with (
@@ -160,12 +160,12 @@ class TestRunInitWizard:
             ):
                 run_init_wizard(tmp_path)
 
-        assert (tmp_path / ".rag-facile" / "agent" / "profile.md").exists()
+        assert (tmp_path / ".agent" / "profile.md").exists()
 
 
 class TestChatInitIntegration:
     def test_init_runs_when_no_rag_facile_dir(self, tmp_path, monkeypatch):
-        """start_learn() calls init wizard when .rag-facile/ is absent."""
+        """start_learn() calls init wizard when .agent/ is absent."""
         (tmp_path / "ragfacile.toml").write_text('[meta]\npreset = "balanced"\n')
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
@@ -182,7 +182,7 @@ class TestChatInitIntegration:
         mock_init.assert_called_once_with(tmp_path)
 
     def test_init_skipped_when_already_initialised(self, tmp_path, monkeypatch):
-        """start_learn() skips init wizard when .rag-facile/agent/ already exists."""
+        """start_learn() skips init wizard when .agent/ already exists."""
         (tmp_path / "ragfacile.toml").write_text('[meta]\npreset = "balanced"\n')
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
