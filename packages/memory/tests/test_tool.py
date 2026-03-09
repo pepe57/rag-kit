@@ -240,3 +240,48 @@ class TestMemorySearch:
     def test_search_empty_agent_dir(self, agent_dir):
         result = memory_search.forward("anything")
         assert "no results" in result.lower()
+
+    def test_search_uses_albert_when_credentials_present(
+        self, memory_file, monkeypatch
+    ):
+        """When OPENAI_API_KEY is set, Albert semantic results are fused in."""
+        sem_result = {
+            "file": "MEMORY.md",
+            "line_start": 3,
+            "line_end": 5,
+            "score": 0.9,
+            "snippet": "Albert semantic hit",
+        }
+
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        import rag_facile.memory.tool as tool_mod
+
+        # Reset singleton so _get_albert_index creates a fresh one
+        tool_mod._albert_index = None
+
+        mock_index = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
+        mock_index.search.return_value = [sem_result]
+
+        with __import__("unittest.mock", fromlist=["patch"]).patch(
+            "rag_facile.memory.tool._get_albert_index", return_value=mock_index
+        ):
+            result = memory_search.forward("Albert")
+
+        assert "result" in result.lower()
+        mock_index.search.assert_called_once()
+
+    def test_search_falls_back_to_keyword_when_no_credentials(
+        self, memory_file, monkeypatch
+    ):
+        """When no API key is present, memory_search uses keyword results only."""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ALBERT_API_KEY", raising=False)
+
+        import rag_facile.memory.tool as tool_mod
+
+        tool_mod._albert_index = None
+
+        result = memory_search.forward("Luis Developer")
+        # Keyword search still finds content
+        assert "result" in result.lower()

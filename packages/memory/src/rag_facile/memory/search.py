@@ -19,7 +19,7 @@ Scoring
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import TypedDict
 
@@ -169,8 +169,6 @@ def _recency_multiplier(file_path: Path) -> float:
         # Fall back to mtime
         try:
             mtime = file_path.stat().st_mtime
-            from datetime import datetime
-
             file_date = datetime.fromtimestamp(mtime).date()  # noqa: DTZ006
         except OSError:
             return 1.0

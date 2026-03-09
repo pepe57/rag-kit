@@ -5,29 +5,58 @@ Four ``@tool``-decorated functions scoped to the ``.agent/`` directory:
 - ``memory_read``   — list a directory or read a file (with optional line range)
 - ``memory_write``  — create or overwrite a file
 - ``memory_edit``   — find-and-replace in a file
-- ``memory_search`` — keyword search across all memory files
+- ``memory_search`` — keyword + optional Albert semantic search across all memory files
 
 All paths are validated to stay within ``.agent/`` (path traversal protection).
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from smolagents import tool
 
 from rag_facile.memory._paths import AGENT_DIR
+
+if TYPE_CHECKING:
+    from rag_facile.memory.albert_search import AlbertMemoryIndex
 
 # ── Module-level workspace reference ──────────────────────────────────────────
 # Set once at session start by the agent harness.
 
 _workspace_root: Path | None = None
 
+# ── Albert index singleton ────────────────────────────────────────────────────
+# Created lazily on first search call when API credentials are available.
+# Reset whenever set_workspace_root() is called with a new path so the index
+# doesn't retain stale collection IDs across tests or workspace changes.
+
+_albert_index: AlbertMemoryIndex | None = None
+
 
 def set_workspace_root(root: Path | None) -> None:
     """Register the workspace root so memory tools can locate ``.agent/``."""
-    global _workspace_root  # noqa: PLW0603
+    global _workspace_root, _albert_index  # noqa: PLW0603
     _workspace_root = root
+    _albert_index = None  # reset when workspace changes so index is re-created
+
+
+def _get_albert_index() -> AlbertMemoryIndex | None:
+    """Return the Albert index singleton, or ``None`` if credentials are absent."""
+    global _albert_index  # noqa: PLW0603
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ALBERT_API_KEY", "")
+    if not api_key:
+        return None
+    if _albert_index is None:
+        from rag_facile.memory.albert_search import AlbertMemoryIndex as _Index
+
+        api_base = os.environ.get(
+            "OPENAI_BASE_URL", "https://albert.api.etalab.gouv.fr/v1"
+        )
+        _albert_index = _Index(api_key=api_key, api_base=api_base)
+    return _albert_index
 
 
 # ── Path safety ───────────────────────────────────────────────────────────────
@@ -268,8 +297,13 @@ def memory_edit(path: str, old_str: str, new_str: str) -> str:
 def memory_search(query: str) -> str:
     """Search across all memory files for relevant information.
 
-    Uses keyword matching to find snippets in MEMORY.md, daily logs, and
-    session archives.  Results include file paths with line ranges — use
+    Runs a local keyword search over all ``.agent/*.md`` files and, when
+    Albert API credentials are available, also performs a semantic vector
+    search against a private Albert collection.  Results from both layers
+    are merged with Reciprocal Rank Fusion so the most relevant snippets
+    surface at the top regardless of which layer found them.
+
+    Results include file paths with line ranges — use
     memory_read(path:start-end) to read more context.
 
     Use this BEFORE memory_read when you need to find information but don't
@@ -282,9 +316,17 @@ def memory_search(query: str) -> str:
     if _workspace_root is None:
         return "No workspace detected — memory unavailable."
 
+    from rag_facile.memory.albert_search import fuse_search_results
     from rag_facile.memory.search import keyword_search
 
-    results = keyword_search(_workspace_root, query, max_results=8)
+    kw_results = keyword_search(_workspace_root, query, max_results=8)
+
+    albert_index = _get_albert_index()
+    if albert_index is not None:
+        sem_results = albert_index.search(query, _workspace_root, limit=8)
+        results = fuse_search_results(kw_results, sem_results, limit=8)
+    else:
+        results = kw_results
 
     if not results:
         return f'No results found for "{query}".'
