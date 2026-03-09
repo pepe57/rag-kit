@@ -55,19 +55,13 @@ class TestReadLanguage:
         assert read_language(tmp_path) == "fr"
 
 
-# questionary.select mock helpers (language first, then experience)
-def _lang_fr_exp_new():
-    return [
-        type("Q", (), {"ask": lambda self: "fr"})(),
-        type("Q", (), {"ask": lambda self: "new"})(),
-    ]
+# questionary.select mock helpers (experience only — language is always French)
+def _exp_new():
+    return [type("Q", (), {"ask": lambda self: "new"})()]
 
 
-def _lang_en_exp_intermediate():
-    return [
-        type("Q", (), {"ask": lambda self: "en"})(),
-        type("Q", (), {"ask": lambda self: "intermediate"})(),
-    ]
+def _exp_intermediate():
+    return [type("Q", (), {"ask": lambda self: "intermediate"})()]
 
 
 class TestRunInitWizard:
@@ -76,7 +70,7 @@ class TestRunInitWizard:
         with (
             patch(
                 "cli.commands.learn.init.questionary.select",
-                side_effect=_lang_fr_exp_new(),
+                side_effect=_exp_new(),
             ),
             patch("cli.commands.learn.init._git_add"),
         ):
@@ -84,22 +78,23 @@ class TestRunInitWizard:
 
         assert (tmp_path / ".agent" / "profile.md").exists()
 
-    def test_returns_selected_language(self, tmp_path):
+    def test_always_returns_french(self, tmp_path):
+        """Wizard always returns 'fr' — language is not selectable."""
         with (
             patch(
                 "cli.commands.learn.init.questionary.select",
-                side_effect=_lang_en_exp_intermediate(),
+                side_effect=_exp_intermediate(),
             ),
             patch("cli.commands.learn.init._git_add"),
         ):
             lang = run_init_wizard(tmp_path)
-        assert lang == "en"
+        assert lang == "fr"
 
     def test_creates_skills_directory(self, tmp_path):
         with (
             patch(
                 "cli.commands.learn.init.questionary.select",
-                side_effect=_lang_en_exp_intermediate(),
+                side_effect=_exp_intermediate(),
             ),
             patch("cli.commands.learn.init._git_add"),
         ):
@@ -111,10 +106,7 @@ class TestRunInitWizard:
         with (
             patch(
                 "cli.commands.learn.init.questionary.select",
-                side_effect=[
-                    type("Q", (), {"ask": lambda self: "en"})(),
-                    type("Q", (), {"ask": lambda self: "expert"})(),
-                ],
+                side_effect=[type("Q", (), {"ask": lambda self: "expert"})()],
             ),
             patch("cli.commands.learn.init._git_add"),
         ):
@@ -140,7 +132,7 @@ class TestRunInitWizard:
         with (
             patch(
                 "cli.commands.learn.init.questionary.select",
-                side_effect=_lang_fr_exp_new(),
+                side_effect=_exp_new(),
             ),
             patch("cli.commands.learn.init._git_add") as mock_git,
         ):
@@ -154,7 +146,7 @@ class TestRunInitWizard:
             with (
                 patch(
                     "cli.commands.learn.init.questionary.select",
-                    side_effect=_lang_fr_exp_new(),
+                    side_effect=_exp_new(),
                 ),
                 patch("cli.commands.learn.init._git_add"),
             ):

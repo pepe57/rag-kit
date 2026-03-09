@@ -41,11 +41,6 @@ _EXPERIENCE_CHOICES = [
     questionary.Choice("Expert — minimal guidance", value="expert"),
 ]
 
-_LANGUAGE_CHOICES = [
-    questionary.Choice("Français 🇫🇷", value="fr"),
-    questionary.Choice("English 🇬🇧", value="en"),
-]
-
 
 # ── Template generators ───────────────────────────────────────────────────────
 
@@ -131,26 +126,17 @@ def run_init_wizard(workspace: Path) -> str:
     )
     console.print()
 
-    # ── Ask 2 questions (language first so the rest adapts) ──────────────────
-    # questionary returns None on Ctrl+C — check after each question so we
-    # don't fall through to the next one when the user cancels.
+    # ── Ask 1 question (language is always French) ────────────────────────────
     language = "fr"
     experience = "new"
     try:
         result = questionary.select(
-            "Preferred language for our conversations?",
-            choices=_LANGUAGE_CHOICES,
+            "Votre niveau d'expérience avec RAG ?",
+            choices=_EXPERIENCE_CHOICES,
             style=_STYLE,
         ).ask()
         if result is not None:
-            language = result
-            result = questionary.select(
-                "Your experience with RAG?",
-                choices=_EXPERIENCE_CHOICES,
-                style=_STYLE,
-            ).ask()
-            if result is not None:
-                experience = result
+            experience = result
     except (EOFError, OSError):
         pass  # non-interactive terminal (pipe, CI) — keep defaults
 
