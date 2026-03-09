@@ -118,6 +118,27 @@ def read_language(workspace: Path) -> str:
     return "fr"
 
 
+def read_experience(workspace: Path) -> str:
+    """Read the experience level from profile.md. Defaults to 'new'.
+
+    Returns one of: 'new', 'intermediate', 'expert'.
+    """
+    profile = workspace / _PROFILE_FILE
+    if not profile.exists():
+        return "new"
+    text = profile.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- Experience level:"):
+            value = stripped.split(":", 1)[1].strip().lower()
+            if "intermediate" in value or "quelques" in value:
+                return "intermediate"
+            if "expert" in value:
+                return "expert"
+            return "new"
+    return "new"
+
+
 def run_init_wizard(workspace: Path) -> str:
     """Run the first-time setup wizard and create .agent/ in the workspace.
 

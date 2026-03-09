@@ -20,7 +20,12 @@ from smolagents.monitoring import LogLevel
 from smolagents.utils import AgentError, AgentMaxStepsError
 
 from cli.commands.learn._console import console
-from cli.commands.learn.init import needs_init, read_language, run_init_wizard
+from cli.commands.learn.init import (
+    needs_init,
+    read_experience,
+    read_language,
+    run_init_wizard,
+)
 from cli.commands.learn.skills import (
     discover_skills,
     format_skills_list,
@@ -177,11 +182,11 @@ one plain sentence per entry.
 **Absolutely forbidden:** tables, ASCII diagrams, sub-sections, \
 inline term definitions, bullet sub-lists, more than 5 numbered items.
 
-Produce this exact structure, word for word in style:
+Examples (always follow this exact format):
 
 ---
-Le RAG, c'est un système qui cherche les bons passages dans vos documents \
-avant de générer une réponse.
+Q : C'est quoi le RAG ?
+R : Le RAG, c'est un système qui cherche les bons passages dans vos documents avant de générer une réponse.
 
 Les grandes étapes :
 1. On découpe vos documents en petits extraits.
@@ -195,6 +200,39 @@ Voulez-vous que j'explique l'une de ces étapes en détail ?
 - **Chunk** : un extrait de texte découpé depuis un document.
 - **Indexation** : l'opération qui rend les extraits recherchables rapidement.
 - **Modèle de langage (LLM)** : le programme qui rédige la réponse finale.
+
+---
+Q : C'est quoi un embedding ?
+R : Un embedding, c'est une façon de transformer du texte en nombres pour que l'ordinateur puisse comparer des phrases.
+
+Comment ça fonctionne :
+1. Chaque extrait de texte est converti en une liste de nombres.
+2. Des textes similaires donnent des listes de nombres proches.
+3. Quand vous posez une question, elle est aussi convertie en nombres.
+4. On cherche les extraits dont les nombres sont les plus proches de votre question.
+
+Voulez-vous que j'explique l'une de ces étapes en détail ?
+
+## Glossaire
+- **Embedding** : représentation numérique d'un texte sous forme de vecteur.
+- **Vecteur** : liste de nombres qui encode le sens d'un texte.
+- **Similarité** : mesure de proximité entre deux vecteurs.
+
+---
+Q : Pourquoi mon système RAG donne de mauvaises réponses ?
+R : Un RAG peut donner de mauvaises réponses pour plusieurs raisons liées à la qualité de la récupération ou du modèle.
+
+Les causes les plus fréquentes :
+1. Les documents récupérés ne contiennent pas la bonne information.
+2. Les extraits sont trop petits ou trop grands pour être utiles.
+3. La question est trop vague pour trouver les bons passages.
+4. Le modèle invente des informations quand il ne sait pas.
+
+Voulez-vous que j'explique comment corriger l'une de ces causes ?
+
+## Glossaire
+- **Récupération** : étape où les passages pertinents sont extraits de la base documentaire.
+- **Hallucination** : fait pour un modèle de générer des informations fausses présentées comme vraies.
 ---
 
 ## STRICT RULE — Configuration changes
@@ -216,6 +254,42 @@ Step 3 — Only if the user replies with a clear yes ("oui", "yes", "ok", "vas-y
 If the user's original message already sounds like a confirmation ("mets top_k à 15"), \
 treat it as a REQUEST, not a confirmation — still ask the explicit question in Step 1.
 """
+
+# ── Newbie format enforcement ─────────────────────────────────────────────────
+
+# Appended to the user message immediately before agent.run() for new users.
+# Proximity to generation = stronger compliance than system prompt alone.
+_FORMAT_ANCHOR = (
+    "\n\n---\n"
+    "FORMAT OBLIGATOIRE : intro courte (1-2 phrases) + "
+    "liste numérotée (max 5 étapes) + ## Glossaire avec des tirets. "
+    "PAS de tableaux. PAS de sous-titres. Commence ta réponse :"
+)
+
+
+def _is_newbie_format_ok(text: str) -> bool:
+    """Return True when a response follows the required newbie format.
+
+    Checks:
+    - Contains ## Glossaire
+    - Contains at least one numbered step (1. …)
+    - No markdown tables (|…|)
+    - No sub-sections beyond ## Glossaire (extra ## headers)
+    - Reasonably short (< 600 words)
+    """
+    import re
+
+    has_glossaire = "## Glossaire" in text or "##Glossaire" in text
+    has_steps = bool(re.search(r"^\d+\.", text, re.MULTILINE))
+    no_tables = not bool(re.search(r"^\|.+\|", text, re.MULTILINE))
+    extra_headers = re.findall(r"^#{2,3}\s+", text, re.MULTILINE)
+    # Allow at most one ## header (the Glossaire itself)
+    no_extra_sections = len(extra_headers) <= 1
+    not_too_long = len(text.split()) < 600
+    return (
+        has_glossaire and has_steps and no_tables and no_extra_sections and not_too_long
+    )
+
 
 # ── Per-language UI strings ───────────────────────────────────────────────────
 
@@ -454,6 +528,7 @@ def start_chat(debug: bool = False) -> None:
     # Detect workspace — walk up from cwd for ragfacile.toml
     workspace = _detect_workspace()
     language = "fr"  # default — overridden once we have a workspace
+    experience = "new"  # default — overridden once we have a workspace
     if workspace:
         load_dotenv(workspace / ".env")  # load API key + config from project .env
         set_workspace_root(workspace)
@@ -463,6 +538,7 @@ def start_chat(debug: bool = False) -> None:
             language = run_init_wizard(workspace)
         else:
             language = read_language(workspace)
+        experience = read_experience(workspace)
 
     ui = _UI.get(language, _UI["fr"])
 
@@ -670,6 +746,11 @@ def start_chat(debug: bool = False) -> None:
             )
             ss.skill_injected = True
 
+        # 1b — Format anchor: append reminder close to generation point for new users.
+        # Proximity bias means this is more effective than system prompt rules alone.
+        if experience == "new":
+            effective_input = effective_input + _FORMAT_ANCHOR
+
         # Retry loop — keeps retrying on 429 until success or Ctrl+C
         response = None
         while True:
@@ -707,6 +788,24 @@ def start_chat(debug: bool = False) -> None:
             continue
 
         response_text = str(response)
+
+        # 1c — Post-processing validator: if the response violates newbie format,
+        # do one targeted retry with an explicit violation message.
+        if experience == "new" and not _is_newbie_format_ok(response_text):
+            retry_input = (
+                f"Ta réponse précédente ne respecte pas le format requis "
+                f"(tableaux, sous-titres, ou trop longue). "
+                f"Réécris-la en suivant EXACTEMENT ce format : "
+                f"1 phrase d'intro + max 5 étapes numérotées + ## Glossaire avec des tirets. "
+                f"PAS de tableaux. PAS de sous-titres.\n\n"
+                f"Question initiale : {user_input}"
+            )
+            with console.status(f"[dim]{ui['thinking']}[/dim]", spinner="dots"):
+                try:
+                    retry_response = agent.run(retry_input, reset=False)
+                    response_text = str(retry_response)
+                except (openai.APIError, AgentError, AgentMaxStepsError):
+                    pass  # keep original response on retry failure
 
         # Episodic logging — record assistant turn
         if workspace:
