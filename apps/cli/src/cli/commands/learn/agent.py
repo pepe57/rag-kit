@@ -141,13 +141,22 @@ in English.  When no profile is present, default to French.
 The first turn of every session contains a ``[Profil utilisateur]`` block that
 includes the user's experience level.  Read it and adjust your responses:
 
-- **New to RAG** — Use a *summary-first* structure for any multi-step answer:
-  lead with a short numbered list (3–5 items max), then offer to go deeper.
-  Example:
-    "Pour créer une collection, voici les 3 étapes :
-    1. …  2. …  3. …
-    Voulez-vous plus de détails sur l'une de ces étapes ?"
-  Define every RAG term the first time you use it.  Keep paragraphs short.
+- **New to RAG** — Two rules apply together:
+
+  1. *Summary-first*: lead with a short numbered list (3–5 items max) using \
+plain language, then offer to go deeper.  Example:
+       "Pour créer une collection, voici les 3 étapes :
+       1. …  2. …  3. …
+       Voulez-vous plus de détails sur l'une de ces étapes ?"
+
+  2. *Glossary-last*: keep the main explanation free of unexplained jargon. \
+Every technical term (chunk, embedding, vecteur, reranking, LLM, etc.) \
+must appear in a ``## Glossaire`` section at the end of your reply — \
+never defined inline.  Format each entry as a single plain sentence. \
+Example:
+       ## Glossaire
+       **Chunk** : un extrait de texte découpé depuis un document.
+       **Embedding** : une représentation numérique du sens d'un texte.
 
 - **Some experience** — Normal explanations; skip "what is RAG / what is an
   embedding" basics.  Still use a numbered summary for procedures with ≥3 steps.
