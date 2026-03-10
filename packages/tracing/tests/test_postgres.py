@@ -153,13 +153,26 @@ class TestPostgresProviderInit:
         mock_conn.execute.assert_called_once_with("SELECT 1")
 
     @patch("psycopg.connect")
-    def test_safe_conninfo_masks_password(self, mock_connect):
-        """The _safe_conninfo property should mask the password."""
+    def test_safe_conninfo_masks_password_uri(self, mock_connect):
+        """The _safe_conninfo property should mask password in URI format."""
         mock_conn = MagicMock()
         mock_connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_connect.return_value.__exit__ = MagicMock(return_value=False)
 
         provider = PostgresProvider("postgresql://postgres:secret@host:5432/db")
+        assert "secret" not in provider._safe_conninfo
+        assert "****" in provider._safe_conninfo
+
+    @patch("psycopg.connect")
+    def test_safe_conninfo_masks_password_keyvalue(self, mock_connect):
+        """The _safe_conninfo property should mask password in key-value format."""
+        mock_conn = MagicMock()
+        mock_connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
+        mock_connect.return_value.__exit__ = MagicMock(return_value=False)
+
+        provider = PostgresProvider(
+            "host=localhost user=postgres password=secret dbname=db"
+        )
         assert "secret" not in provider._safe_conninfo
         assert "****" in provider._safe_conninfo
 

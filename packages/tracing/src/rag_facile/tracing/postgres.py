@@ -130,10 +130,18 @@ class PostgresProvider(TracingProvider):
     @property
     def _safe_conninfo(self) -> str:
         """Connection string with password masked for logging."""
-        # Mask anything between :// and @ (user:pass section)
-        import re
+        import psycopg.conninfo
 
-        return re.sub(r"(://[^:]+:)[^@]+(@)", r"\1****\2", self._conninfo)
+        try:
+            params = psycopg.conninfo.conninfo_to_dict(self._conninfo)
+            if "password" in params and params["password"]:
+                params["password"] = "****"
+            return psycopg.conninfo.make_conninfo(**params)
+        except psycopg.ProgrammingError:
+            # Fallback: mask URI-style password
+            import re
+
+            return re.sub(r"(://[^:]+:)[^@]+(@)", r"\1****\2", self._conninfo)
 
     # ── TracingProvider interface ──
 

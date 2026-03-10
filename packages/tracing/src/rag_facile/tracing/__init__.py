@@ -24,6 +24,7 @@ Typical usage from an application (after LLM generation)::
 from __future__ import annotations
 
 import contextvars
+import os
 import threading
 from pathlib import Path
 from collections.abc import Callable
@@ -157,8 +158,6 @@ def get_tracer(config: Any | None = None) -> TracingProvider:
 
                     conn_str = tracing_cfg.connection_string
                     if not conn_str:
-                        import os
-
                         conn_str = os.environ.get("DATABASE_URL", "")
                     if not conn_str:
                         msg = (

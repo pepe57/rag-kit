@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS traces (
     latency_ms        INTEGER,
 
     -- Config snapshot (FK → config_snapshots.hash)
-    config_hash       TEXT NOT NULL DEFAULT ''
+    config_hash       TEXT NOT NULL
         REFERENCES config_snapshots(hash),
 
     -- User feedback

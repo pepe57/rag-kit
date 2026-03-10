@@ -129,8 +129,8 @@ For multi-user deployments, add per-user RLS policies (see comments in migration
 ## Stopping
 
 ```bash
-supabase stop        # stop containers (data preserved)
-supabase stop --all  # stop and remove all data
+supabase stop            # stop containers (data preserved)
+supabase stop --no-backup  # stop and remove all data volumes
 ```
 
 ## Creating New Migrations
