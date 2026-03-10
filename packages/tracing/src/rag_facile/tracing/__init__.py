@@ -152,6 +152,22 @@ def get_tracer(config: Any | None = None) -> TracingProvider:
                     from .sqlite import SQLiteProvider
 
                     _tracer = SQLiteProvider(_resolve_db_path(tracing_cfg.database))
+                case "postgres":
+                    from .postgres import PostgresProvider
+
+                    conn_str = tracing_cfg.connection_string
+                    if not conn_str:
+                        import os
+
+                        conn_str = os.environ.get("DATABASE_URL", "")
+                    if not conn_str:
+                        msg = (
+                            "Postgres tracing requires a connection string. "
+                            "Set tracing.connection_string in ragfacile.toml "
+                            "or the DATABASE_URL environment variable."
+                        )
+                        raise ValueError(msg)
+                    _tracer = PostgresProvider(conn_str)
                 case "none":
                     from .noop import NoopProvider
 
@@ -159,7 +175,7 @@ def get_tracer(config: Any | None = None) -> TracingProvider:
                 case _:
                     msg = (
                         f"Unknown tracing provider: {tracing_cfg.provider!r}. "
-                        "Expected 'sqlite' or 'none'."
+                        "Expected 'sqlite', 'postgres', or 'none'."
                     )
                     raise ValueError(msg)
 

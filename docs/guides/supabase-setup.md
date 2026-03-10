@@ -61,7 +61,14 @@ Update `ragfacile.toml`:
 ```toml
 [tracing]
 provider = "postgres"
-connection_string = "${DATABASE_URL}"
+```
+
+The provider automatically reads `DATABASE_URL` from the environment. You can also set `connection_string` explicitly in the TOML if preferred:
+
+```toml
+[tracing]
+provider = "postgres"
+connection_string = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 ```
 
 ### 5. Verify
