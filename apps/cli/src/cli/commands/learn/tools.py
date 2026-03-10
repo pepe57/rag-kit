@@ -220,6 +220,18 @@ def activate_skill(name: str) -> str:
     return load_skill(_available_skills[name])
 
 
+# ── Memory tools ──────────────────────────────────────────────────────────────
+# Re-exported from rag_facile.memory.tool so they appear in this module's
+# namespace alongside the other tools.  The agent harness registers them
+# in the ToolCallingAgent tool list.
+
+from rag_facile.memory.tool import memory_edit  # noqa: E402, F401
+from rag_facile.memory.tool import memory_read  # noqa: E402, F401
+from rag_facile.memory.tool import memory_search  # noqa: E402, F401
+from rag_facile.memory.tool import memory_write  # noqa: E402, F401
+from rag_facile.memory.tool import set_workspace_root as _set_memory_workspace  # noqa: E402, F401
+
+
 # ── CLI runner ────────────────────────────────────────────────────────────────
 
 # Subcommands the agent is allowed to run — prevents accidental execution of

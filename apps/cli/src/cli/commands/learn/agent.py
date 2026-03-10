@@ -5,6 +5,8 @@ Entry point: start_chat() — called when the user runs `rag-facile learn`.
 
 import os
 import time
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 import openai
@@ -13,11 +15,11 @@ from dotenv import load_dotenv
 from rich.markdown import Markdown
 from rich.panel import Panel
 from smolagents import OpenAIServerModel, ToolCallingAgent
+from smolagents.memory import ActionStep, TaskStep
 from smolagents.monitoring import LogLevel
 from smolagents.utils import AgentError, AgentMaxStepsError
 
 from cli.commands.learn._console import console
-
 from cli.commands.learn.init import needs_init, read_language, run_init_wizard
 from cli.commands.learn.skills import (
     discover_skills,
@@ -25,18 +27,16 @@ from cli.commands.learn.skills import (
     install_skill,
     load_skill,
 )
-from cli.commands.learn.memory import (
-    append_turn,
-    git_commit_session,
-    increment_session_count,
-    load_context,
-    update_memory,
-)
 from cli.commands.learn.tools import (
+    _set_memory_workspace,
     activate_skill,
     get_agents_md,
     get_docs,
     get_recent_git_activity,
+    memory_edit,
+    memory_read,
+    memory_search,
+    memory_write,
     run_rag_facile,
     set_available_skills,
     set_workspace_root,
@@ -90,6 +90,34 @@ DO NOT use if the user is merely asking about skills or how they work.
 Only activate ONE skill per session. If no skill clearly fits, respond directly in \
 natural language — this is always a valid choice.
 
+## Memory — persistent file storage
+
+You have a memory directory (.agent/) that persists across sessions.
+
+IMPORTANT: ALWAYS read your memory directory before doing anything else. \
+Use memory_read(".") to see what files exist from previous sessions.
+
+MEMORY PROTOCOL:
+1. memory_read(".")          → check your memory directory
+2. memory_read("MEMORY.md")  → read your curated facts
+3. Work on the user's task
+4. memory_write() or memory_edit() → save important facts proactively
+
+SEARCH BEFORE READ: When you need a specific fact but don't know which file it's in, \
+use memory_search("query") FIRST. It returns ranked snippets with file:line references \
+that you can drill into with memory_read("file:start-end").
+
+ASSUME INTERRUPTION: Your context window might be reset at any moment. \
+Record progress to memory so future sessions can pick up where you left off.
+
+Users can type /new to start a fresh session. Your memory will be saved automatically \
+before the reset — any facts you wrote to MEMORY.md will be available in the next session.
+
+Keep memory organized: use memory_edit() to update existing facts. \
+Use memory_write() to create or overwrite entire files. \
+Available memory sections in MEMORY.md: \
+User Identity, Preferences, Project State, Key Facts, Routing Table, Recent Context.
+
 ## RULE — Always use tools; never answer from memory
 
 When the user asks to SEE or READ current state (config values, collections, version), \
@@ -124,6 +152,11 @@ Step 3 — Only if the user replies with a clear yes ("oui", "yes", "ok", "vas-y
 
 If the user's original message already sounds like a confirmation ("mets top_k à 15"), \
 treat it as a REQUEST, not a confirmation — still ask the explicit question in Step 1.
+
+## Language
+
+Respond in **French** by default. If the user writes in a different language, \
+adapt and respond in their language for the rest of the conversation.
 """
 
 # ── Per-language UI strings ───────────────────────────────────────────────────
@@ -134,7 +167,8 @@ _UI: dict[str, dict[str, str]] = {
         "subtitle": (
             "Posez-moi vos questions sur RAG, votre configuration "
             "ou comment améliorer vos résultats.\n"
-            "Tapez [bold]q[/bold] ou Ctrl+C pour quitter."
+            "Tapez [bold]/new[/bold] pour une nouvelle session, "
+            "[bold]q[/bold] ou Ctrl+C pour quitter."
         ),
         "no_workspace_hint": (
             "\n[dim]💡 Aucun ragfacile.toml trouvé — lancez "
@@ -150,6 +184,7 @@ _UI: dict[str, dict[str, str]] = {
             "Pouvez-vous reformuler ou poser une question plus simple\u00a0?"
         ),
         "rate_limited": "Limite de requêtes atteinte — nouvelle tentative dans {n}s (Ctrl+C pour annuler)\u00a0...",
+        "session_reset": "🔄 Nouvelle session — mémoire sauvegardée.",
         "skill_loaded": "📚 Compétence '{name}' activée.",
         "skill_cleared": "📚 Compétence désactivée.",
         "skill_not_found": "Compétence '{name}' introuvable. Tapez /skills pour voir la liste.",
@@ -159,7 +194,8 @@ _UI: dict[str, dict[str, str]] = {
         "greeting": "Bonjour! I'm your RAG assistant.",
         "subtitle": (
             "Ask me anything about RAG, your pipeline config, or how to improve your results.\n"
-            "Type [bold]q[/bold] or press Ctrl+C to quit."
+            "Type [bold]/new[/bold] for a new session, "
+            "[bold]q[/bold] or Ctrl+C to quit."
         ),
         "no_workspace_hint": (
             "\n[dim]💡 No ragfacile.toml found — run "
@@ -175,6 +211,7 @@ _UI: dict[str, dict[str, str]] = {
             "Could you rephrase or break it into smaller questions?"
         ),
         "rate_limited": "Rate limit reached — retrying in {n}s (Ctrl+C to cancel)...",
+        "session_reset": "🔄 New session — memory saved.",
         "skill_loaded": "📚 Skill '{name}' activated.",
         "skill_cleared": "📚 Skill deactivated.",
         "skill_not_found": "Skill '{name}' not found. Type /skills to see the list.",
@@ -187,11 +224,71 @@ _UI: dict[str, dict[str, str]] = {
 _RATE_LIMIT_WAIT = 15
 
 
+class _SessionState:
+    """Mutable session state — reset via ``new()`` for /new command."""
+
+    __slots__ = (
+        "turns",
+        "start",
+        "turn_count",
+        "first_turn",
+        "active_skill",
+        "active_skill_content",
+        "skill_injected",
+    )
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset all fields to their initial values."""
+        self.turns: list[dict[str, str]] = []
+        self.start: datetime = datetime.now()  # noqa: DTZ005
+        self.turn_count: int = 0
+        self.first_turn: bool = True
+        self.active_skill: str | None = None
+        self.active_skill_content: str | None = None
+        self.skill_injected: bool = False
+
+
+# Maximum number of ActionSteps to keep in the agent's memory.
+# Older steps have their model_input_messages cleared to free memory,
+# and then are removed, keeping only the most recent ones.
+_MAX_AGENT_STEPS = 20
+
+
+def _trim_agent_memory(step: ActionStep, *, agent: ToolCallingAgent) -> None:
+    """Step callback: prune old steps from the agent's in-memory history.
+
+    Keeps:
+    - All ``TaskStep`` instances (required for context)
+    - The most recent *_MAX_AGENT_STEPS* ``ActionStep`` instances
+    Removes older ``ActionStep`` instances and clears their
+    ``model_input_messages`` to free the largest objects first.
+    """
+    action_steps = [s for s in agent.memory.steps if isinstance(s, ActionStep)]
+    if len(action_steps) <= _MAX_AGENT_STEPS:
+        return
+
+    # Steps to prune: oldest action steps beyond the limit
+    steps_to_prune = action_steps[:-_MAX_AGENT_STEPS]
+    to_prune = {id(s) for s in steps_to_prune}
+    for s in steps_to_prune:
+        s.model_input_messages = None  # free largest object first
+
+    agent.memory.steps = [
+        s
+        for s in agent.memory.steps
+        if isinstance(s, TaskStep) or id(s) not in to_prune
+    ]
+
+
 _TOOL_ICONS: dict[str, str] = {
     "activate_skill": "📚",
     "get_agents_md": "📋",
     "get_recent_git_activity": "📜",
     "get_docs": "📖",
+    "memory_search": "🔍",
     "run_rag_facile": "🖥️",
 }
 
@@ -253,6 +350,48 @@ def _build_model() -> OpenAIServerModel:
     )
 
 
+def _finalize(
+    workspace: Path | None,
+    session_turns: list[dict[str, str]],
+    session_start: datetime,
+) -> None:
+    """End-of-session housekeeping (best-effort, never raises)."""
+    if not workspace or not session_turns:
+        return
+    try:
+        from rag_facile.memory.lifecycle import finalize_session
+
+        # Build an LLM-backed fact extractor if API credentials are available.
+        extract_fn = _build_extract_fn()
+
+        finalize_session(
+            workspace, session_turns, session_start, extract_facts_fn=extract_fn
+        )
+    except Exception as exc:  # noqa: BLE001 — session finalization must never crash the CLI
+        import logging
+
+        logging.warning("Session finalization failed: %s", exc)
+
+
+def _build_extract_fn() -> Callable[[str], list[tuple[str, str]]] | None:
+    """Return an ``extract_facts_fn`` closure, or None if credentials are missing."""
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ALBERT_API_KEY", "")
+    api_base = os.environ.get("OPENAI_BASE_URL", "https://albert.api.etalab.gouv.fr/v1")
+    model = os.environ.get("RAG_ASSISTANT_MODEL", "openweight-large")
+
+    if not api_key:
+        return None
+
+    from rag_facile.memory.lifecycle import extract_facts_with_llm
+
+    def _extract(transcript: str) -> list[tuple[str, str]]:
+        return extract_facts_with_llm(
+            transcript, api_key=api_key, api_base=api_base, model=model
+        )
+
+    return _extract
+
+
 def start_chat(debug: bool = False) -> None:
     """Launch the interactive RAG assistant chat loop."""
     # Detect workspace — walk up from cwd for ragfacile.toml
@@ -261,7 +400,8 @@ def start_chat(debug: bool = False) -> None:
     if workspace:
         load_dotenv(workspace / ".env")  # load API key + config from project .env
         set_workspace_root(workspace)
-        # First-run: initialise .rag-facile/ and capture chosen language
+        _set_memory_workspace(workspace)
+        # First-run: initialise .agent/ and capture chosen language
         if needs_init(workspace):
             language = run_init_wizard(workspace)
         else:
@@ -272,18 +412,27 @@ def start_chat(debug: bool = False) -> None:
     # Load persistent memory — injected into the first user turn (not system prompt)
     # so the model pays full attention to it rather than losing it at the end of
     # smolagents' long built-in system prompt.
-    memory_context = load_context(workspace) if workspace else ""
+    from rag_facile.memory.context import bootstrap_context
+    from rag_facile.memory.stores import EpisodicLog, SemanticStore
 
-    # Increment session count (best-effort — workspace may be None)
+    # Compact old episodic logs before loading context (prunes stale data)
     if workspace:
-        increment_session_count(workspace)
+        from rag_facile.memory.lifecycle import compact_episodic_logs
+
+        compact_episodic_logs(workspace)
+
+    profile_context = bootstrap_context(workspace) if workspace else ""
+
+    # Ensure MEMORY.md exists (creates from template on first session)
+    if workspace and not (workspace / ".agent" / "MEMORY.md").exists():
+        SemanticStore.create(workspace)
+
+    # Session state — used by lifecycle hooks; reset by /new
+    ss = _SessionState()
 
     # Discover skills: built-in + workspace (.agents/skills/)
     available_skills = discover_skills(workspace)
     set_available_skills(available_skills)  # expose to activate_skill tool
-    active_skill: str | None = None  # name of currently loaded skill
-    active_skill_content: str | None = None  # SKILL.md content to inject
-    skill_injected = False  # True once content has been sent to agent
 
     # Build model + agent — typer.Exit propagates naturally on missing API key
     model = _build_model()
@@ -291,10 +440,9 @@ def start_chat(debug: bool = False) -> None:
     # Side-effect hook: when the agent calls activate_skill(), persist the returned
     # content so it's injected into subsequent turns (same as explicit /skills load).
     def _on_skill_activated(skill_name: str, content: str) -> None:
-        nonlocal active_skill, active_skill_content, skill_injected
-        active_skill = skill_name
-        active_skill_content = content
-        skill_injected = True  # content already in agent context this turn
+        ss.active_skill = skill_name
+        ss.active_skill_content = content
+        ss.skill_injected = True  # content already in agent context this turn
         console.print(f"[dim]{ui['skill_loaded'].format(name=skill_name)}[/dim]")
 
     def _wrap_activate_skill(tool_obj):
@@ -319,6 +467,10 @@ def start_chat(debug: bool = False) -> None:
             get_recent_git_activity,
             get_docs,
             run_rag_facile,
+            memory_read,
+            memory_write,
+            memory_edit,
+            memory_search,
         ]
     ] + [_wrap_activate_skill(activate_skill)]
 
@@ -328,9 +480,8 @@ def start_chat(debug: bool = False) -> None:
         instructions=_SYSTEM_PROMPT,
         verbosity_level=LogLevel.INFO if debug else LogLevel.OFF,
         max_steps=5,
+        step_callbacks=[_trim_agent_memory],
     )
-
-    session_turns: list[tuple[str, str]] = []  # accumulated for post-session update
 
     # Welcome
     workspace_line = (
@@ -352,6 +503,7 @@ def start_chat(debug: bool = False) -> None:
             user_input = console.input(f"[bold cyan]{ui['you']}[/bold cyan]: ").strip()
         except (KeyboardInterrupt, EOFError):
             console.print(f"\n[dim]{ui['goodbye']}[/dim]")
+            _finalize(workspace, ss.turns, ss.start)
             break
 
         if not user_input:
@@ -359,7 +511,24 @@ def start_chat(debug: bool = False) -> None:
 
         if user_input.lower() in ("q", "quit", "exit", "bye", "au revoir", "quitter"):
             console.print(f"[dim]{ui['goodbye']}[/dim]")
+            _finalize(workspace, ss.turns, ss.start)
             break
+
+        # ── /new — reset session ──────────────────────────────────────────────
+        if user_input.strip().lower() == "/new":
+            _finalize(workspace, ss.turns, ss.start)
+            ss.reset()
+
+            # Reset agent conversation history
+            if hasattr(agent, "memory") and agent.memory is not None:
+                agent.memory.reset()
+
+            # Reload profile context for the new session
+            profile_context = bootstrap_context(workspace) if workspace else ""
+
+            console.print(f"[dim]{ui['session_reset']}[/dim]")
+            console.print()
+            continue
 
         # ── /skills slash commands ────────────────────────────────────────────
         _skill_bootstrap = (
@@ -392,22 +561,22 @@ def start_chat(debug: bool = False) -> None:
                     available_skills = discover_skills(workspace)
 
             elif sub == "clear":
-                active_skill = None
-                active_skill_content = None
-                skill_injected = False
+                ss.active_skill = None
+                ss.active_skill_content = None
+                ss.skill_injected = False
                 console.print(f"[dim]{ui['skill_cleared']}[/dim]")
 
             elif sub in available_skills:
                 # /skills <name> — explicit load: activate and bootstrap the flow
-                active_skill = sub
-                active_skill_content = load_skill(available_skills[sub])
+                ss.active_skill = sub
+                ss.active_skill_content = load_skill(available_skills[sub])
                 console.print(f"[dim]{ui['skill_loaded'].format(name=sub)}[/dim]")
                 # Inject skill + trigger word so the agent starts its flow immediately
                 user_input = (
-                    f"[Compétence chargée: {sub}]\n{active_skill_content}\n\n---\n\n"
+                    f"[Compétence chargée: {sub}]\n{ss.active_skill_content}\n\n---\n\n"
                     "Commence."
                 )
-                skill_injected = True
+                ss.skill_injected = True
                 _skill_bootstrap = (
                     True  # skip the outer continue — fall through to agent
                 )
@@ -421,23 +590,29 @@ def start_chat(debug: bool = False) -> None:
         # Skill activation is handled by the agent itself via the activate_skill tool.
         # No keyword auto-detection here — the LLM picks the right skill semantically.
 
+        # Episodic logging — record user turn
+        if workspace:
+            EpisodicLog.append_turn(workspace, "user", user_input)
+        ss.turns.append({"role": "user", "content": user_input})
+        ss.turn_count += 1
+
         # Build effective_input — layer memory (first turn) + skill (on load) + message
         effective_input = user_input
 
-        # Inject memory on first turn of the session
-        if memory_context and not session_turns:
+        # Inject profile on first turn of the session
+        if profile_context and ss.first_turn:
             effective_input = (
-                f"[Mémoire des sessions précédentes]\n{memory_context}\n\n---\n\n"
-                f"{effective_input}"
+                f"[Profil utilisateur]\n{profile_context}\n\n---\n\n{effective_input}"
             )
+            ss.first_turn = False
 
         # Inject skill content the first time a skill becomes active
-        if active_skill_content and not skill_injected:
+        if ss.active_skill_content and not ss.skill_injected:
             effective_input = (
-                f"[Compétence chargée: {active_skill}]\n{active_skill_content}\n\n---\n\n"
+                f"[Compétence chargée: {ss.active_skill}]\n{ss.active_skill_content}\n\n---\n\n"
                 f"{effective_input}"
             )
-            skill_injected = True
+            ss.skill_injected = True
 
         # Retry loop — keeps retrying on 429 until success or Ctrl+C
         response = None
@@ -475,21 +650,21 @@ def start_chat(debug: bool = False) -> None:
         if response is None:
             continue
 
-        console.print("[bold green]Assistant[/bold green]:")
-        console.print(Markdown(str(response)))
-        console.print()
+        response_text = str(response)
 
-        # Log turn to today's conversation file
+        # Episodic logging — record assistant turn
         if workspace:
-            append_turn(workspace, "user", user_input)
-            append_turn(workspace, "assistant", str(response))
-            session_turns.append((user_input, str(response)))
+            EpisodicLog.append_turn(workspace, "assistant", response_text)
+        ss.turns.append({"role": "assistant", "content": response_text})
+        ss.turn_count += 1
 
-    # ── Post-session: update memory + git commit ──────────────────────────────
-    if workspace and session_turns:
-        session_log = "\n\n".join(
-            f"Vous: {u}\nAssistant: {a}" for u, a in session_turns
-        )
-        with console.status("[dim]Mise à jour de la mémoire...[/dim]", spinner="dots"):
-            update_memory(workspace, session_log)
-            git_commit_session(workspace)
+        # Mid-session checkpoint every 8 turns
+        if workspace:
+            from rag_facile.memory.lifecycle import run_checkpoint, should_checkpoint
+
+            if should_checkpoint(ss.turn_count):
+                run_checkpoint(workspace, ss.turns[-8:])
+
+        console.print("[bold green]Assistant[/bold green]:")
+        console.print(Markdown(response_text))
+        console.print()

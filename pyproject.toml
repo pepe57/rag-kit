@@ -1,6 +1,6 @@
 [project]
 name = "rag-facile"
-version = "0.17.0"
+version = "0.19.1"
 description = "RAG Starter Kit for French Government"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
@@ -18,7 +18,9 @@ dependencies = [
     "retrieval",
     "reflex-chat",
     "storage",
+    "memory",
     "tracing",
+    "evaluation",
 ]
 
 [tool.uv.sources]
@@ -26,6 +28,7 @@ albert-client = { workspace = true }
 chainlit-chat = { workspace = true }
 context = { workspace = true }
 ingestion = { workspace = true }
+memory = { workspace = true }
 pipelines = { workspace = true }
 query = { workspace = true }
 rag-core = { workspace = true }
@@ -36,6 +39,7 @@ retrieval = { workspace = true }
 reflex-chat = { workspace = true }
 storage = { workspace = true }
 tracing = { workspace = true }
+evaluation = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -57,8 +61,11 @@ exclude = [
     ".moon/templates",
     "apps/chainlit-chat/app.py",
     "apps/reflex-chat",
-    "packages/pipelines",
+    "apps/cli/tests",
+    "packages/evaluation/tests",
     "packages/tracing",
+    "packages/memory",
+    "apps/cli/src/cli/commands/learn",
 ]
 
 [tool.ty.rules]

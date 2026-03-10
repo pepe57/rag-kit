@@ -5,7 +5,7 @@ behaviour for a specific task. They are discovered from three locations:
 
   1. Built-in  — bundled with the CLI package at cli/skills/
   2. npx       — installed via `npx skills add <pkg>` into <workspace>/.agents/skills/
-  3. Project   — hand-crafted by the user at <workspace>/.rag-facile/skills/
+  3. Project   — hand-crafted by the user at <workspace>/.agents/skills/
 
 Skills are loaded by injecting their SKILL.md content into the agent's system
 prompt. Only one skill is active at a time per session.

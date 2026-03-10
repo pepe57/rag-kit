@@ -37,7 +37,7 @@ def _search_result_to_chunk(result) -> RetrievedChunk:
 def search_chunks(
     client: AlbertClient,
     query: str,
-    collection_ids: list[int],
+    collection_ids: list[int | str],
     *,
     limit: int = 10,
     method: str = "hybrid",
@@ -60,9 +60,13 @@ def search_chunks(
     # rejects it for hybrid/lexical methods with a 400 Bad Request.
     effective_threshold = score_threshold if method == "semantic" else None
 
+    # Albert API requires integer collection IDs; coerce from str if needed
+    # (e.g. when IDs are read from env vars or mixed-type config sources).
+    collection_ids_int: list[int] = [int(c) for c in collection_ids]
+
     response = client.search(
         query=query,
-        collection_ids=collection_ids,
+        collection_ids=collection_ids_int,
         limit=limit,
         method=method,
         score_threshold=effective_threshold,

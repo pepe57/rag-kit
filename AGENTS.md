@@ -56,6 +56,7 @@ rag-facile/
 │   ├── context/                   # Context formatting (rag_facile.context)
 │   ├── storage/                   # Collection management (rag_facile.storage)
 │   ├── tracing/                   # Pipeline tracing & observability (rag_facile.tracing)
+│   ├── evaluation/                # RAG evaluation with Inspect AI (rag_facile.evaluation)
 │   └── rag-facile-lib/            # Library bundle for external projects
 ├── .moon/                         # Moon workspace config
 │   ├── templates/                 # App/package templates (Tera syntax)
@@ -66,8 +67,7 @@ rag-facile/
 │   ├── reference/                 # Reference docs (ragfacile.toml, components)
 │   └── troubleshooting/           # Problem-solving guides
 ├── pyproject.toml                 # Root workspace config
-├── install.sh                     # Installation script (macOS/Linux)
-├── install.ps1                    # Installation script (Windows)
+├── install.sh                     # Installation script (macOS/Linux/Windows via Git Bash)
 └── README.md                      # Main project documentation
 ```
 
@@ -282,7 +282,7 @@ When adding a new package to the monorepo (`packages/mypkg/`):
 
 ### Library Package + rag_facile Namespace (✅ PR #121, Feb 17, 2026)
 - **What changed**: All 7 pipeline packages now live under `rag_facile.*` namespace
-- **Packages**: `rag_facile.core`, `rag_facile.ingestion`, `rag_facile.pipelines`, `rag_facile.retrieval`, `rag_facile.reranking`, `rag_facile.context`, `rag_facile.storage`, `rag_facile.tracing`
+- **Packages**: `rag_facile.core`, `rag_facile.ingestion`, `rag_facile.pipelines`, `rag_facile.retrieval`, `rag_facile.reranking`, `rag_facile.context`, `rag_facile.storage`, `rag_facile.tracing`, `rag_facile.evaluation`
 - **New bundle**: `packages/rag-facile-lib/` bundles all pipeline packages for external projects
 - **Generated projects** now depend on `rag-facile-lib` via git URL (no more copying pipeline source)
 - **Standalone** structure: `pyproject.toml` + frontend app + `src/<name>/` for user code
@@ -384,7 +384,60 @@ python -m pytest apps/cli/tests/
 - **Project README**: https://github.com/etalab-ia/rag-facile/README.md
 - **CONTRIBUTING**: CONTRIBUTING.md in repo root
 
-## 10. Special Knowledge for This Agent
+## 10. Agent Memory System
+
+The `rag-facile` chat assistant has a persistent memory system stored in the `.agent/` directory within the user's workspace. Other coding agents (Claude Code, Letta Code, Antigravity) can read and use these files.
+
+### Directory Layout
+
+```
+<workspace>/
+└── .agent/
+    ├── MEMORY.md           # Semantic store — curated facts about the user
+    ├── profile.md          # Session count + language preference
+    ├── logs/               # Episodic daily logs (append-only, compacted after 2 days)
+    │   └── YYYY-MM-DD.md   # One file per day with turns and checkpoints
+    └── sessions/           # Archived session transcripts
+        └── YYYYMMDD_HHMMSS.md  # One file per completed session
+```
+
+### MEMORY.md Sections
+
+The semantic store has 6 fixed sections, each serving a specific purpose:
+
+| Section | Purpose | Example |
+|---------|---------|---------|
+| User Identity | Who the user is | `Name is Luis, works at DINUM` |
+| Preferences | How they like things done | `Prefers French language for UI` |
+| Project State | Current project status | `Using Albert API v0.4.1` |
+| Key Facts | Important learned facts | `Preset changed to accurate` |
+| Routing Table | Skill/tool routing info | Agent-internal routing data |
+| Recent Context | Latest session context | Current topic or task |
+
+### How Memory Works
+
+1. **Agent tools**: During a session, the agent can call `memory_read`, `memory_write`, and `memory_edit` to interact with MEMORY.md.
+2. **Checkpoints**: Every 8 turns, a structured checkpoint is saved to the episodic log (summary, decisions, facts).
+3. **Consolidation**: When a new entry is added, it checks for existing entries on the same topic and *replaces* (not duplicates) them.
+4. **Fact extraction**: At session end, an LLM call extracts key facts from the conversation and routes them to the appropriate MEMORY.md section.
+5. **Compaction**: Old episodic logs (>2 days) are pruned to keep only checkpoint entries. Overfull MEMORY.md sections are trimmed (oldest entries removed).
+6. **Git commit**: All `.agent/` changes are committed to git at session end (best-effort, skipped if `.agent/` is gitignored).
+
+### Package Location
+
+- **Source**: `packages/memory/src/rag_facile/memory/`
+- **Modules**: `stores.py`, `tool.py`, `context.py`, `lifecycle.py`, `consolidation.py`, `_paths.py`
+- **Tests**: `packages/memory/tests/`
+
+### For Other Agents
+
+To discover and use the memory:
+1. Check if `.agent/MEMORY.md` exists in the workspace
+2. Read it — it's plain Markdown with YAML frontmatter
+3. Each `## Section` contains `- [YYYY-MM-DD] fact` entries
+4. The `profile.md` file has session count and language preference
+
+## 11. Special Knowledge for This Agent
 
 ### About Luis (The User)
 - Values explicit over implicit (prefers explicit paths vs globs)

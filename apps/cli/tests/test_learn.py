@@ -82,3 +82,165 @@ class TestLearnCommand:
             result = tools.run_rag_facile("version")
 
         assert "0.17.0" in result
+
+
+class TestNewCommand:
+    """/new command resets session and saves memory."""
+
+    def test_new_command_prints_reset_message(self, monkeypatch):
+        """/new shows the session reset message."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        with (
+            patch("cli.commands.learn.agent._detect_workspace", return_value=None),
+            patch("cli.commands.learn.agent.OpenAIServerModel"),
+            patch("cli.commands.learn.agent.ToolCallingAgent"),
+        ):
+            # Type /new, then q to quit
+            result = runner.invoke(main_app, ["learn"], input="/new\nq\n")
+
+        assert result.exit_code == 0
+        # Session reset message visible (without workspace, finalize is a no-op)
+        assert "session" in result.output.lower()
+
+    def test_new_command_calls_finalize(self, monkeypatch, tmp_path):
+        """/new triggers session finalization before resetting."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+        # Create a minimal workspace
+        (tmp_path / "ragfacile.toml").write_text("")
+        (tmp_path / ".env").write_text("")
+        agent_dir = tmp_path / ".agent"
+        agent_dir.mkdir()
+        (agent_dir / "profile.md").write_text(
+            "# Profile\n\n## Session Count\n0\n", encoding="utf-8"
+        )
+        (agent_dir / "MEMORY.md").write_text("# Memory\n", encoding="utf-8")
+
+        with (
+            patch("cli.commands.learn.agent._detect_workspace", return_value=tmp_path),
+            patch("cli.commands.learn.agent.OpenAIServerModel"),
+            patch("cli.commands.learn.agent.ToolCallingAgent") as mock_agent_cls,
+            patch("cli.commands.learn.agent.needs_init", return_value=False),
+            patch("cli.commands.learn.agent.read_language", return_value="en"),
+            patch("cli.commands.learn.agent._finalize") as mock_finalize,
+        ):
+            mock_agent = mock_agent_cls.return_value
+            mock_agent.run.return_value = "Hello!"
+            mock_agent.memory = None
+
+            # Ask a question, then /new, then quit
+            result = runner.invoke(main_app, ["learn"], input="hello\n/new\nq\n")
+
+        assert result.exit_code == 0
+        # _finalize called twice: once for /new, once for quit
+        assert mock_finalize.call_count == 2
+
+
+# ── _build_extract_fn ─────────────────────────────────────────────────────────
+
+
+class TestBuildExtractFn:
+    """Unit tests for the fact-extraction closure builder."""
+
+    def test_returns_none_without_api_key(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ALBERT_API_KEY", raising=False)
+        from cli.commands.learn.agent import _build_extract_fn
+
+        assert _build_extract_fn() is None
+
+    def test_returns_callable_with_api_key(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        from cli.commands.learn.agent import _build_extract_fn
+
+        fn = _build_extract_fn()
+        assert callable(fn)
+
+    def test_closure_calls_extract_facts_with_llm(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost/v1")
+        monkeypatch.setenv("RAG_ASSISTANT_MODEL", "test-model")
+        from unittest.mock import MagicMock, patch as _patch
+
+        from cli.commands.learn.agent import _build_extract_fn
+
+        fn = _build_extract_fn()
+
+        # Mock the OpenAI client that extract_facts_with_llm creates internally
+        mock_message = MagicMock()
+        mock_message.content = "[Key Facts] test fact"
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with _patch("openai.OpenAI", return_value=mock_client):
+            result = fn("transcript text")
+
+        assert result == [("Key Facts", "test fact")]
+        # Verify the client was configured with our env vars
+        mock_client.chat.completions.create.assert_called_once()
+
+
+# ── _trim_agent_memory ────────────────────────────────────────────────────────
+
+
+class TestTrimAgentMemory:
+    """Unit tests for the step callback that prunes old agent steps."""
+
+    def test_noop_when_under_limit(self):
+        from unittest.mock import MagicMock
+
+        from smolagents.memory import ActionStep, AgentMemory, TaskStep
+        from smolagents.monitoring import Timing
+
+        from cli.commands.learn.agent import _MAX_AGENT_STEPS, _trim_agent_memory
+
+        agent = MagicMock()
+        memory = AgentMemory(system_prompt="test")
+        memory.steps.append(TaskStep(task="test"))
+        for i in range(_MAX_AGENT_STEPS - 1):
+            memory.steps.append(
+                ActionStep(step_number=i, timing=Timing(start_time=0, end_time=0))
+            )
+        agent.memory = memory
+
+        step = memory.steps[-1]
+        _trim_agent_memory(step, agent=agent)
+        # All steps should remain (under limit)
+        action_count = sum(1 for s in memory.steps if isinstance(s, ActionStep))
+        assert action_count == _MAX_AGENT_STEPS - 1
+
+    def test_prunes_oldest_steps(self):
+        from unittest.mock import MagicMock
+
+        from smolagents.memory import ActionStep, AgentMemory, TaskStep
+        from smolagents.monitoring import Timing
+
+        from cli.commands.learn.agent import _MAX_AGENT_STEPS, _trim_agent_memory
+
+        agent = MagicMock()
+        memory = AgentMemory(system_prompt="test")
+        memory.steps.append(TaskStep(task="test"))
+        for i in range(_MAX_AGENT_STEPS + 10):
+            memory.steps.append(
+                ActionStep(step_number=i, timing=Timing(start_time=0, end_time=0))
+            )
+        agent.memory = memory
+
+        step = memory.steps[-1]
+        _trim_agent_memory(step, agent=agent)
+
+        action_count = sum(1 for s in memory.steps if isinstance(s, ActionStep))
+        assert action_count == _MAX_AGENT_STEPS
+        # TaskStep preserved
+        assert any(isinstance(s, TaskStep) for s in memory.steps)
+        # Oldest steps removed — highest step_number should survive
+        remaining_numbers = [
+            s.step_number for s in memory.steps if isinstance(s, ActionStep)
+        ]
+        assert remaining_numbers[-1] == _MAX_AGENT_STEPS + 9
