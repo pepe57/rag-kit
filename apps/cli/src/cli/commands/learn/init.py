@@ -36,14 +36,9 @@ _STYLE = questionary.Style(
 )
 
 _EXPERIENCE_CHOICES = [
-    questionary.Choice("New to RAG — explain everything step by step", value="new"),
-    questionary.Choice("Some experience — skip the basics", value="intermediate"),
-    questionary.Choice("Expert — minimal guidance", value="expert"),
-]
-
-_LANGUAGE_CHOICES = [
-    questionary.Choice("Français 🇫🇷", value="fr"),
-    questionary.Choice("English 🇬🇧", value="en"),
+    questionary.Choice("Nouveau — expliquer pas à pas", value="new"),
+    questionary.Choice("Quelques notions — passer les bases", value="intermediate"),
+    questionary.Choice("Expert — guidance minimale", value="expert"),
 ]
 
 
@@ -110,6 +105,27 @@ def read_language(workspace: Path) -> str:
     return "fr"
 
 
+def read_experience(workspace: Path) -> str:
+    """Read the experience level from profile.md. Defaults to 'new'.
+
+    Returns one of: 'new', 'intermediate', 'expert'.
+    """
+    profile = workspace / _PROFILE_FILE
+    if not profile.exists():
+        return "new"
+    text = profile.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- Experience level:"):
+            value = stripped.split(":", 1)[1].strip().lower()
+            if "intermediate" in value or "quelques" in value:
+                return "intermediate"
+            if "expert" in value:
+                return "expert"
+            return "new"
+    return "new"
+
+
 def run_init_wizard(workspace: Path) -> str:
     """Run the first-time setup wizard and create .agent/ in the workspace.
 
@@ -117,40 +133,33 @@ def run_init_wizard(workspace: Path) -> str:
     Uses questionary for interactive prompts; falls back to defaults in
     non-interactive environments (CI, pipe).
 
+    Language is inferred from the system locale (no question asked).
+
     Returns:
-        The selected language code ('fr' or 'en').
+        The detected language code ('fr' or 'en').
     """
     console.print(
         Panel(
-            "[bold]Welcome to rag-facile![/bold]\n"
-            "[dim]Let me set up your AI assistant. This takes about 30 seconds "
-            "and only happens once.[/dim]",
+            "[bold]Bienvenue dans rag-facile\u00a0![/bold]\n"
+            "[dim]Configurons votre assistant IA. Cela prend environ 30 secondes "
+            "et ne se fait qu'une seule fois.[/dim]",
             border_style="magenta",
             padding=(0, 1),
         )
     )
     console.print()
 
-    # ── Ask 2 questions (language first so the rest adapts) ──────────────────
-    # questionary returns None on Ctrl+C — check after each question so we
-    # don't fall through to the next one when the user cancels.
+    # ── Ask 1 question (language is always French) ────────────────────────────
     language = "fr"
     experience = "new"
     try:
         result = questionary.select(
-            "Preferred language for our conversations?",
-            choices=_LANGUAGE_CHOICES,
+            "Votre niveau d'expérience avec RAG ?",
+            choices=_EXPERIENCE_CHOICES,
             style=_STYLE,
         ).ask()
         if result is not None:
-            language = result
-            result = questionary.select(
-                "Your experience with RAG?",
-                choices=_EXPERIENCE_CHOICES,
-                style=_STYLE,
-            ).ask()
-            if result is not None:
-                experience = result
+            experience = result
     except (EOFError, OSError):
         pass  # non-interactive terminal (pipe, CI) — keep defaults
 
@@ -169,7 +178,7 @@ def run_init_wizard(workspace: Path) -> str:
 
     # ── Confirmation ──────────────────────────────────────────────────────────
     console.print()
-    console.print("[green]✓[/green] Assistant ready")
+    console.print("[green]✓[/green] Assistant prêt")
     console.print(f"[dim]  Profile: {workspace / _PROFILE_FILE}[/dim]")
     console.print()
 
