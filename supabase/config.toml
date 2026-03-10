@@ -7,8 +7,7 @@
 # For self-hosted production, point `supabase db push --db-url` at
 # your remote Postgres instance — no Supabase Cloud required.
 
-[project]
-id = "rag-facile"
+project_id = "rag-facile"
 
 [db]
 port = 54322
