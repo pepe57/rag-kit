@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0](https://github.com/etalab-ia/rag-facile/compare/v0.19.1...v0.20.0) (2026-03-10)
+
+
+### Features
+
+* **albert-client:** add /me/info and /me/keys management methods ([858010d](https://github.com/etalab-ia/rag-facile/commit/858010df40e24102209a50ef738fb461dcf3167f))
+* **albert-client:** update to Albert API 0.4.1 ([e65898d](https://github.com/etalab-ia/rag-facile/commit/e65898d231273e62bf461e87142b8c9b75ae59fd))
+* Tier 1 format enforcement — few-shot, format anchor, validator+retry ([b5f2664](https://github.com/etalab-ia/rag-facile/commit/b5f26648db853226ca800b423f6a0d2c5b096055))
+
+
+### Bug Fixes
+
+* adapt learn assistant tone and verbosity to user experience level ([65f9683](https://github.com/etalab-ia/rag-facile/commit/65f9683bf129e5dff3b089ed961ccfea55483b90))
+* adapt learn assistant tone and verbosity to user experience level ([070cc0b](https://github.com/etalab-ia/rag-facile/commit/070cc0b219c32f93aa4fdcad6701ec7191e65fb2))
+* add complete response example to newbie style instruction ([136b797](https://github.com/etalab-ia/rag-facile/commit/136b7979bba6fffba04e40dafe472c9e2141cbdc))
+* add rag-facile architecture facts to prevent LLM hallucination ([3195351](https://github.com/etalab-ia/rag-facile/commit/319535184b85415bea6011420a9e754662b69e34))
+* align get_docs() trigger with system prompt rules, prefer live data ([0c6b1c4](https://github.com/etalab-ia/rag-facile/commit/0c6b1c4e1eab076d76dfa48d9bf74901e73fc254))
+* allow get_docs() for rag-facile specific facts, block for RAG concepts ([589aca4](https://github.com/etalab-ia/rag-facile/commit/589aca4031b4d7b1608ae69b56889ed222d79e6d))
+* always default to French — remove locale detection, add language instruction ([92ff5f5](https://github.com/etalab-ia/rag-facile/commit/92ff5f54a5a9bc719c4c30dab4856dbd687baea8))
+* block get_docs() for new users — doc retrieval was the root cause ([65ec5d4](https://github.com/etalab-ia/rag-facile/commit/65ec5d4a8a18096a6fd890391bc0c4bc7455041a))
+* **ci:** allow PEP 440 post/dev/rc suffixes in albert version check ([bd6ba93](https://github.com/etalab-ia/rag-facile/commit/bd6ba93ffd3081d6b4292492d0da578fab2dc61c))
+* glossaire entries as bullet list (- prefix) for vertical rendering ([962a101](https://github.com/etalab-ia/rag-facile/commit/962a101d8b0376d5208c4d7e67512daf48b8a422))
+* inject language instruction into agent system prompt ([6cac5ff](https://github.com/etalab-ia/rag-facile/commit/6cac5fff67dcc099ef18970d1b84413864b836c5))
+* inject language instruction into agent system prompt ([addd872](https://github.com/etalab-ia/rag-facile/commit/addd872ae2eeb2abe8e8c57dd58d19ac9b7db581))
+* newbie responses — plain language + glossary-last for technical terms ([c5955f5](https://github.com/etalab-ia/rag-facile/commit/c5955f5943501414174df3ea02cf5fde4a431dad))
+* pass GITHUB_TOKEN to install.sh to avoid API rate limits in CI ([81a6f99](https://github.com/etalab-ia/rag-facile/commit/81a6f99a99340c99d5335fba8081264e5d96e039))
+* promote newbie format to STRICT RULE and enforce in explain-rag skill ([90c6a6c](https://github.com/etalab-ia/rag-facile/commit/90c6a6cb616de70fcdfd7b10681a5db42f6b29b8))
+* remove language question from init wizard — detect from system locale ([a075048](https://github.com/etalab-ia/rag-facile/commit/a075048c47ae571fc30ab9bfc0ab3bb18a8cb809))
+* respond in French by default, follow user language if they switch ([2cbbc70](https://github.com/etalab-ia/rag-facile/commit/2cbbc70e6b160c5385ca9781d56d1a0785a57dd8))
+* **retrieval:** apply 0.4.1 API params to main's new AlbertRetrievalProvider class ([1439224](https://github.com/etalab-ia/rag-facile/commit/1439224868af495d4cfedd140609400291812801))
+* translate init wizard question and choices to French ([208ef28](https://github.com/etalab-ia/rag-facile/commit/208ef28c953ea849316533f352cac2872017d135))
+
 ## [0.19.1](https://github.com/etalab-ia/rag-facile/compare/v0.19.0...v0.19.1) (2026-03-09)
 
 
