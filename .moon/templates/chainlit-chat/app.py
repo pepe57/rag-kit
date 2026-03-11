@@ -9,14 +9,14 @@ import engineio
 import engineio.payload
 from chainlit.input_widget import Switch
 from dotenv import load_dotenv
-from rag_facile.pipelines import process_query
-from rag_facile.tracing import update_trace_with_response
 from supabase import create_client
 from supabase_auth.errors import AuthApiError
 
 from albert import AsyncAlbertClient
 from rag_facile.core import get_config
 from rag_facile.core.mediatech import get_collection_name
+from rag_facile.pipelines import process_query
+from rag_facile.tracing import update_trace_with_response
 
 
 # Increase the number of packets allowed in a single payload to prevent "Too
@@ -60,15 +60,31 @@ async def auth_callback(username: str, password: str) -> Optional[cl.User]:
     user = response.user
     if not user:
         return None
+    # Use the stable Supabase UUID as identifier for reliable user tracking.
+    # Email can change; the UUID is immutable and unique across all users.
     return cl.User(
-        identifier=user.email or username,
-        metadata={"role": "user", "provider": "supabase", "sub": str(user.id)},
+        identifier=str(user.id),
+        metadata={
+            "role": "user",
+            "provider": "supabase",
+            "email": user.email or username,
+        },
     )
 
 
 @cl.on_chat_resume
 async def on_chat_resume(thread: cl.ThreadDict) -> None:
     """Restore conversation history when resuming a thread."""
+    # Defense-in-depth: verify the thread belongs to the current user.
+    # Chainlit's data layer does not enforce per-user filtering on get_thread(),
+    # so we guard here until RLS policies are added.
+    current_user = cl.user_session.get("user")
+    if current_user and thread.get("userIdentifier") != current_user.identifier:
+        await cl.Message(
+            content="Unauthorized: this thread does not belong to you."
+        ).send()
+        return
+
     # Rebuild message history from the persisted thread
     message_history = [
         {"role": "system", "content": rag_config.generation.system_prompt}

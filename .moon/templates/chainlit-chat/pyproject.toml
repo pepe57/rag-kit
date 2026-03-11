@@ -10,6 +10,8 @@ dependencies = [
     "chainlit>=1.3.0",
     "python-dotenv>=1.0.0",
     "supabase>=2.0.0",
+    # workspace packages
+    "rag-core",
 ]
 
 [project.scripts]

@@ -92,7 +92,7 @@ Copy the `API URL` and `anon key` values.
 ```bash
 # Supabase Auth (enables Chainlit login)
 SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=<anon key from supabase status>
+SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
 ### 3. Create users
