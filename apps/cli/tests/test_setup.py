@@ -510,10 +510,9 @@ class TestGenerateStandalone:
 class TestInitialGitCommit:
     """Unit tests for _initial_git_commit helper."""
 
-    def test_commit_succeeds_with_git_identity(self, mocker, tmp_path):
-        """Should create a commit when git identity is already configured."""
+    def test_commit_called(self, mocker, tmp_path):
+        """Should stage all files and create a commit."""
         mock_run = mocker.patch("subprocess.run")
-        # git config --get user.name → returncode 0 (identity present)
         mock_run.return_value = mocker.MagicMock(returncode=0)
 
         from cli.commands.setup import _initial_git_commit
@@ -525,25 +524,21 @@ class TestInitialGitCommit:
         commit_cmds = [c for c in calls if len(c) > 1 and c[1] == "commit"]
         assert len(commit_cmds) == 1
 
-    def test_sets_local_identity_when_missing(self, mocker, tmp_path):
-        """Should set local user.name/email before committing when global config is absent."""
-        call_results = []
+    def test_shows_warning_when_commit_fails(self, mocker, tmp_path, capsys):
+        """Should print a helpful warning when git commit fails (e.g. missing user config)."""
+        import subprocess
 
         def fake_run(cmd, **kwargs):
-            call_results.append(cmd)
-            # git config --get user.name → returncode 1 (no identity)
-            if cmd == ["git", "config", "--get", "user.name"]:
-                return mocker.MagicMock(returncode=1)
+            if cmd[:2] == ["git", "commit"]:
+                raise subprocess.CalledProcessError(128, cmd)
             return mocker.MagicMock(returncode=0)
 
         mocker.patch("subprocess.run", side_effect=fake_run)
 
         from cli.commands.setup import _initial_git_commit
 
+        # Should not raise
         _initial_git_commit(tmp_path)
-
-        assert ["git", "config", "user.name", "rag-facile"] in call_results
-        assert ["git", "config", "user.email", "setup@rag-facile.local"] in call_results
 
 
 class TestGenerateStandaloneReflex:

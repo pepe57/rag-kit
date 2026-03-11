@@ -588,11 +588,7 @@ def _init_git_repo(target_path: Path) -> None:
 
 
 def _initial_git_commit(target_path: Path) -> None:
-    """Stage all generated files and create the initial commit (best-effort).
-
-    If no global git user.name/email is configured (common on fresh machines),
-    sets a local default so the commit always succeeds.
-    """
+    """Stage all generated files and create the initial commit (best-effort)."""
     try:
         subprocess.run(
             ["git", "add", "."],
@@ -600,31 +596,6 @@ def _initial_git_commit(target_path: Path) -> None:
             check=True,
             capture_output=True,
         )
-
-        # Ensure git identity is available — required for commit.
-        # Check local + global + system config; set a local fallback if none found.
-        has_identity = (
-            subprocess.run(
-                ["git", "config", "--get", "user.name"],
-                cwd=target_path,
-                capture_output=True,
-            ).returncode
-            == 0
-        )
-        if not has_identity:
-            subprocess.run(
-                ["git", "config", "user.name", "rag-facile"],
-                cwd=target_path,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.email", "setup@rag-facile.local"],
-                cwd=target_path,
-                check=True,
-                capture_output=True,
-            )
-
         subprocess.run(
             ["git", "commit", "-m", "chore: initial workspace setup by rag-facile"],
             cwd=target_path,
@@ -636,8 +607,10 @@ def _initial_git_commit(target_path: Path) -> None:
         pass  # git not installed
     except subprocess.CalledProcessError:
         console.print(
-            "[yellow]  ⚠ initial commit skipped"
-            " — run manually: git add . && git commit -m 'initial setup'[/yellow]"
+            "[yellow]  ⚠ initial commit skipped — configure git identity first:[/yellow]"
+            "\n[dim]    git config --global user.name 'Your Name'[/dim]"
+            "\n[dim]    git config --global user.email 'you@example.com'[/dim]"
+            "\n[dim]  Then run: git add . && git commit -m 'initial setup'[/dim]"
         )
 
 
