@@ -494,6 +494,52 @@ class TestGenerateStandalone:
         git_init_calls = [c for c in calls if c.args[0] == ["git", "init"]]
         assert len(git_init_calls) == 1
 
+    def test_creates_initial_git_commit(
+        self, standalone_target, mock_standalone_deps, preset_config
+    ):
+        """Should stage all files and create an initial commit."""
+        self._run_generate_standalone(standalone_target, preset_config)
+        calls = mock_standalone_deps["subprocess"].call_args_list
+        cmds = [c[0][0] for c in calls]
+        assert ["git", "add", "."] in cmds
+        commit_calls = [c for c in cmds if c[:2] == ["git", "commit"]]
+        assert len(commit_calls) == 1
+        assert "chore: initial workspace setup by rag-facile" in commit_calls[0]
+
+
+class TestInitialGitCommit:
+    """Unit tests for _initial_git_commit helper."""
+
+    def test_commit_called(self, mocker, tmp_path):
+        """Should stage all files and create a commit."""
+        mock_run = mocker.patch("subprocess.run")
+        mock_run.return_value = mocker.MagicMock(returncode=0)
+
+        from cli.commands.setup import _initial_git_commit
+
+        _initial_git_commit(tmp_path)
+
+        calls = [c[0][0] for c in mock_run.call_args_list]
+        assert ["git", "add", "."] in calls
+        commit_cmds = [c for c in calls if len(c) > 1 and c[1] == "commit"]
+        assert len(commit_cmds) == 1
+
+    def test_shows_warning_when_commit_fails(self, mocker, tmp_path, capsys):
+        """Should print a helpful warning when git commit fails (e.g. missing user config)."""
+        import subprocess
+
+        def fake_run(cmd, **kwargs):
+            if cmd[:2] == ["git", "commit"]:
+                raise subprocess.CalledProcessError(128, cmd)
+            return mocker.MagicMock(returncode=0)
+
+        mocker.patch("subprocess.run", side_effect=fake_run)
+
+        from cli.commands.setup import _initial_git_commit
+
+        # Should not raise
+        _initial_git_commit(tmp_path)
+
 
 class TestGenerateStandaloneReflex:
     """Tests for standalone Reflex project generation."""

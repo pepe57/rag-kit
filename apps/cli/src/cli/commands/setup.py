@@ -606,7 +606,12 @@ def _initial_git_commit(target_path: Path) -> None:
     except FileNotFoundError:
         pass  # git not installed
     except subprocess.CalledProcessError:
-        pass  # no git user config, or nothing to commit — skip silently
+        console.print(
+            "[yellow]  ⚠ initial commit skipped — configure git identity first:[/yellow]"
+            "\n[dim]    git config --global user.name 'Your Name'[/dim]"
+            "\n[dim]    git config --global user.email 'you@example.com'[/dim]"
+            "\n[dim]  Then run: git add . && git commit -m 'initial setup'[/dim]"
+        )
 
 
 def run_command(cmd: list[str], description: str, cwd: Path | None = None) -> bool:
