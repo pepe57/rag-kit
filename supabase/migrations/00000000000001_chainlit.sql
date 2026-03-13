@@ -1,80 +1,68 @@
 -- Migration: Chainlit data layer schema
 --
--- Tables required by Chainlit's SQLAlchemyDataLayer for persistent
+-- Tables required by Chainlit's ChainlitDataLayer (asyncpg) for persistent
 -- conversation history, step tracking, file elements, and feedback.
 --
--- Schema translated from Chainlit's official documentation:
--- https://docs.chainlit.io/data-layers/sqlalchemy
+-- Table and column names must match exactly what ChainlitDataLayer queries.
+-- Chainlit uses PascalCase table names and camelCase column names (with double
+-- quotes) — we preserve them exactly to avoid mapping issues.
 --
--- Includes columns added in later Chainlit versions:
---   - "modes"        (v2.9.4)
---   - "autoCollapse" (v2.10)
---
--- Chainlit uses camelCase column names — we preserve them exactly
--- to avoid any mapping issues with SQLAlchemyDataLayer.
+-- Derived from chainlit/data/chainlit_data_layer.py INSERT/SELECT statements.
 
--- ── Users ─────────────────────────────────────────────────────────
+-- ── Users ──────────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS users (
-    "id"         UUID PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS "User" (
+    "id"         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "identifier" TEXT NOT NULL UNIQUE,
     "metadata"   JSONB NOT NULL DEFAULT '{}'::jsonb,
-    "createdAt"  TEXT
+    "createdAt"  TIMESTAMPTZ DEFAULT now(),
+    "updatedAt"  TIMESTAMPTZ DEFAULT now()
 );
 
--- ── Threads (conversations) ───────────────────────────────────────
+-- ── Threads (conversations) ────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS threads (
-    "id"             UUID PRIMARY KEY,
-    "createdAt"      TEXT,
+CREATE TABLE IF NOT EXISTS "Thread" (
+    "id"             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name"           TEXT,
-    "userId"         UUID REFERENCES users("id") ON DELETE CASCADE,
+    "userId"         UUID REFERENCES "User"("id") ON DELETE SET NULL,
     "userIdentifier" TEXT,
     "tags"           TEXT[],
-    "metadata"       JSONB
+    "metadata"       JSONB,
+    "createdAt"      TIMESTAMPTZ DEFAULT now(),
+    "updatedAt"      TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_threads_user
-    ON threads ("userId");
+CREATE INDEX IF NOT EXISTS idx_thread_user ON "Thread" ("userId");
+CREATE INDEX IF NOT EXISTS idx_thread_updated ON "Thread" ("updatedAt" DESC);
 
--- ── Steps (individual messages / tool calls) ──────────────────────
+-- ── Steps (messages and tool calls) ───────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS steps (
-    "id"            UUID PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS "Step" (
+    "id"            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "threadId"      UUID NOT NULL REFERENCES "Thread"("id") ON DELETE CASCADE,
+    "parentId"      UUID,
     "name"          TEXT NOT NULL,
     "type"          TEXT NOT NULL,
-    "threadId"      UUID NOT NULL REFERENCES threads("id") ON DELETE CASCADE,
-    "parentId"      UUID,
-    "streaming"     BOOLEAN NOT NULL DEFAULT false,
-    "waitForAnswer" BOOLEAN,
-    "isError"       BOOLEAN,
-    "metadata"      JSONB,
-    "tags"          TEXT[],
     "input"         TEXT,
     "output"        TEXT,
-    "createdAt"     TEXT,
-    "command"       TEXT,
-    "start"         TEXT,
-    "end"           TEXT,
-    "generation"    JSONB,
+    "metadata"      JSONB,
+    "tags"          TEXT[],
     "showInput"     TEXT,
-    "language"      TEXT,
-    "indent"        INT,
-    "defaultOpen"   BOOLEAN,
-    "modes"         TEXT,
-    "autoCollapse"  BOOLEAN
+    "isError"       BOOLEAN DEFAULT false,
+    "startTime"     TIMESTAMPTZ,
+    "endTime"       TIMESTAMPTZ,
+    "createdAt"     TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_steps_thread
-    ON steps ("threadId");
-CREATE INDEX IF NOT EXISTS idx_steps_created
-    ON steps ("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_step_thread ON "Step" ("threadId");
+CREATE INDEX IF NOT EXISTS idx_step_start ON "Step" ("startTime");
 
--- ── Elements (file attachments, images, etc.) ─────────────────────
+-- ── Elements (file attachments, images, etc.) ─────────────────────────────
 
-CREATE TABLE IF NOT EXISTS elements (
-    "id"          UUID PRIMARY KEY,
-    "threadId"    UUID REFERENCES threads("id") ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS "Element" (
+    "id"          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "threadId"    UUID REFERENCES "Thread"("id") ON DELETE CASCADE,
+    "stepId"      UUID REFERENCES "Step"("id") ON DELETE CASCADE,
     "type"        TEXT,
     "url"         TEXT,
     "chainlitKey" TEXT,
@@ -84,61 +72,57 @@ CREATE TABLE IF NOT EXISTS elements (
     "size"        TEXT,
     "page"        INT,
     "language"    TEXT,
-    "forId"       UUID,
     "mime"        TEXT,
-    "props"       JSONB
+    "props"       JSONB,
+    "metadata"    JSONB
 );
 
-CREATE INDEX IF NOT EXISTS idx_elements_thread
-    ON elements ("threadId");
+CREATE INDEX IF NOT EXISTS idx_element_thread ON "Element" ("threadId");
+CREATE INDEX IF NOT EXISTS idx_element_step ON "Element" ("stepId");
 
--- ── Feedbacks ─────────────────────────────────────────────────────
+-- ── Feedbacks ──────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS feedbacks (
-    "id"       UUID PRIMARY KEY,
-    "forId"    UUID NOT NULL,
-    "threadId" UUID NOT NULL REFERENCES threads("id") ON DELETE CASCADE,
-    "value"    INT NOT NULL,
-    "comment"  TEXT
+CREATE TABLE IF NOT EXISTS "Feedback" (
+    "id"      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "stepId"  UUID NOT NULL REFERENCES "Step"("id") ON DELETE CASCADE,
+    "name"    TEXT,
+    "value"   INT NOT NULL,
+    "comment" TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_feedbacks_for
-    ON feedbacks ("forId");
+CREATE INDEX IF NOT EXISTS idx_feedback_step ON "Feedback" ("stepId");
 
--- ── Row Level Security ────────────────────────────────────────────
--- Same pattern as tracing: RLS enabled to lock down PostgREST access.
--- Application connects as postgres role with full access.
--- anon/authenticated roles have no policies = no access.
+-- ── Row Level Security ─────────────────────────────────────────────────────
+-- RLS is enabled to prevent direct PostgREST access from anon/authenticated
+-- roles. The application connects as the postgres role which has full access.
 
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
-ALTER TABLE steps ENABLE ROW LEVEL SECURITY;
-ALTER TABLE elements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Thread" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Step" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Element" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Feedback" ENABLE ROW LEVEL SECURITY;
 
--- Full access for the application's postgres role
-CREATE POLICY users_app_full_access ON users
+CREATE POLICY user_app_full_access ON "User"
     FOR ALL TO postgres USING (true) WITH CHECK (true);
 
-CREATE POLICY threads_app_full_access ON threads
+CREATE POLICY thread_app_full_access ON "Thread"
     FOR ALL TO postgres USING (true) WITH CHECK (true);
 
-CREATE POLICY steps_app_full_access ON steps
+CREATE POLICY step_app_full_access ON "Step"
     FOR ALL TO postgres USING (true) WITH CHECK (true);
 
-CREATE POLICY elements_app_full_access ON elements
+CREATE POLICY element_app_full_access ON "Element"
     FOR ALL TO postgres USING (true) WITH CHECK (true);
 
-CREATE POLICY feedbacks_app_full_access ON feedbacks
+CREATE POLICY feedback_app_full_access ON "Feedback"
     FOR ALL TO postgres USING (true) WITH CHECK (true);
 
--- ── Future: per-user isolation ────────────────────────────────────
--- When multi-user auth is enabled, add policies like:
+-- ── Future: per-user row isolation ────────────────────────────────────────
+-- When multi-user auth is production-hardened, add policies like:
 --
---   CREATE POLICY threads_user_isolation ON threads
+--   CREATE POLICY thread_user_isolation ON "Thread"
 --       FOR ALL TO authenticated
---       USING ((select auth.uid()) = "userId")
---       WITH CHECK ((select auth.uid()) = "userId");
+--       USING ((select auth.uid()::text) = "userIdentifier")
+--       WITH CHECK ((select auth.uid()::text) = "userIdentifier");
 --
--- Note: wrap auth.uid() in (select ...) for performance —
--- prevents per-row function evaluation (see security-rls-performance).
+-- Note: wrap auth.uid() in (select ...) to prevent per-row evaluation.
