@@ -65,6 +65,7 @@ async def auth_callback(username: str, password: str) -> Optional[cl.User]:
     # Email can change; the UUID is immutable and unique across all users.
     return cl.User(
         identifier=str(user.id),
+        display_name=user.email or username,
         metadata={
             "role": "user",
             "provider": "supabase",
