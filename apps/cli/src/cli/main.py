@@ -13,6 +13,7 @@ from cli.commands import (
     generate_dataset,
     learn,
     setup,
+    traces,
 )
 
 
@@ -151,6 +152,19 @@ app.command(
     help="Generate synthetic Q/A evaluation dataset from documents",
     rich_help_panel=_PANEL_ADVANCED_TOOLS,
 )(generate_dataset.run)
+
+# Traces command group
+traces_app = typer.Typer(
+    name="traces",
+    help="Inspect and manage RAG pipeline traces",
+    no_args_is_help=True,
+)
+traces_app.command("export", help="Export traces as JSONL")(traces.export_traces)
+traces_app.command("list", help="List recent traces")(traces.list_traces)
+traces_app.command("prune", help="Delete traces older than N days")(traces.prune_traces)
+traces_app.command("show", help="Show full detail of a trace")(traces.show_trace)
+traces_app.command("stats", help="Show aggregate statistics")(traces.stats_traces)
+app.add_typer(traces_app, name="traces", rich_help_panel=_PANEL_ADVANCED_TOOLS)
 
 
 if __name__ == "__main__":
