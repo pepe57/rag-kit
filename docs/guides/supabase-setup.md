@@ -75,6 +75,60 @@ connection_string = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 Open Supabase Studio at http://localhost:54323 to browse tables.
 
+## Enable Chainlit Authentication
+
+When `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set, Chainlit shows a login form and validates credentials against Supabase Auth (GoTrue).
+
+### 1. Generate a JWT secret
+
+Chainlit requires a secret to sign session tokens:
+
+```bash
+chainlit create-secret
+```
+
+Copy the output value.
+
+### 2. Get Supabase credentials
+
+```bash
+supabase status
+```
+
+Copy the **`API URL`** (e.g. `http://127.0.0.1:54321`) and **`anon key`** values.
+
+> **Common mistake**: do not use the `REST URL` (`http://127.0.0.1:54321/rest/v1`) — the supabase client appends `/auth/v1/token` to whatever you set, so a trailing `/rest/v1` produces a 404.
+
+### 3. Add to `.env`
+
+```bash
+# Required: JWT secret for Chainlit session tokens
+CHAINLIT_AUTH_SECRET=your_chainlit_auth_secret_here
+
+# Supabase Auth (enables Chainlit login)
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+### 4. Create users
+
+In Supabase Studio (http://localhost:54323):
+
+1. Go to **Authentication** → **Users**
+2. Click **Create new user**
+3. Enter email and password
+4. Toggle **Auto Confirm User** (for local development)
+
+### 5. Restart Chainlit
+
+```bash
+just run chainlit
+```
+
+The login form appears. Sign in with the user you created.
+
+> **Note**: Auth is optional. Without `SUPABASE_URL` and `SUPABASE_ANON_KEY`, Chainlit runs without login (current behavior). `CHAINLIT_AUTH_SECRET` is only required when auth is enabled.
+
 ## Colima Users (macOS)
 
 If you use [Colima](https://github.com/abiosoft/colima) instead of Docker Desktop, you may hit permission errors on `supabase start`:
