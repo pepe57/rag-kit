@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 from typing import Annotated, Optional
 
+import statistics
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -304,9 +306,9 @@ def stats_traces() -> None:
 
     # ── Latency panel ──
     if latencies:
-        avg_ms = int(sum(latencies) / len(latencies))
+        avg_ms = int(statistics.mean(latencies))
         sorted_lat = sorted(latencies)
-        p50 = sorted_lat[len(sorted_lat) // 2]
+        p50 = int(statistics.median(latencies))
         p95 = sorted_lat[int(len(sorted_lat) * 0.95)]
         latency_lines = [
             f"[bold]Count:[/bold]  {len(latencies):,}",
