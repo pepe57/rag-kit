@@ -95,7 +95,9 @@ Copy the output value.
 supabase status
 ```
 
-Copy the `API URL` and `anon key` values.
+Copy the **`API URL`** (e.g. `http://127.0.0.1:54321`) and **`anon key`** values.
+
+> **Common mistake**: do not use the `REST URL` (`http://127.0.0.1:54321/rest/v1`) — the supabase client appends `/auth/v1/token` to whatever you set, so a trailing `/rest/v1` produces a 404.
 
 ### 3. Add to `.env`
 
