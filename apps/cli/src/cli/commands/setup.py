@@ -436,13 +436,18 @@ py-modules = ["app"]
 
 [tool.setuptools.packages.find]
 where = ["src"]"""
+        # Chainlit uses supabase for auth and asyncpg for data layer
+        extra_deps = """\
+    "supabase>=2.0.0",
+    "asyncpg>=0.29.0",
+"""
     else:
         frontend_dep = '"reflex>=0.7.0",'
         # App package at root, src/ for additional user code
-        setuptools_block = f"""\
-[tool.setuptools.packages.find]
+        setuptools_block = f"""\n[tool.setuptools.packages.find]
 include = ["{snake_name}*"]
 where = [".", "src"]"""
+        extra_deps = ""
 
     pyproject_content = f'''[project]
 name = "{project_name}"
@@ -454,7 +459,7 @@ dependencies = [
     "ragtime-lib",
     {frontend_dep}
     "python-dotenv>=1.0.0",
-]
+{extra_deps}]
 
 [dependency-groups]
 dev = [
