@@ -519,7 +519,7 @@ package = true
 
     # Create src/<project_name>/ for user's own modules
     src_dir = target_path / "src" / snake_name
-    src_dir.mkdir(parents=True)
+    src_dir.mkdir(parents=True, exist_ok=True)
     (src_dir / "__init__.py").write_text("")
     console.print(f"[dim]  ✓ src/{snake_name}/__init__.py[/dim]")
 
