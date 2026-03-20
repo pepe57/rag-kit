@@ -7,7 +7,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/etalab-ia/ragtime/main/install.sh | bash
 #
 # Variables d'environnement :
-#   RAG_FACILE_VERSION  Version spécifique à installer (par défaut : dernière version)
+#   RAGTIME_VERSION  Version spécifique à installer (par défaut : dernière version)
 
 set -e
 
@@ -94,8 +94,8 @@ fi
 
 # ── 3. Récupération de la version ─────────────────────────────────────────────
 
-if [[ -n "${RAG_FACILE_VERSION:-}" ]]; then
-    LATEST_TAG="$RAG_FACILE_VERSION"
+if [[ -n "${RAGTIME_VERSION:-}" ]]; then
+    LATEST_TAG="$RAGTIME_VERSION"
     echo "==> Utilisation de la version : $LATEST_TAG"
 else
     echo "==> Récupération de la dernière version..."
@@ -110,7 +110,7 @@ else
 
     if [[ -z "$LATEST_TAG" ]]; then
         echo "ERREUR : impossible de récupérer la dernière version depuis l'API GitHub."
-        echo "         Vérifiez votre connexion ou définissez RAG_FACILE_VERSION manuellement."
+        echo "         Vérifiez votre connexion ou définissez RAGTIME_VERSION manuellement."
         exit 1
     fi
 
