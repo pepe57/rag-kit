@@ -1,7 +1,8 @@
 # Ragtime — A modular RAG pipeline (alpha)
 
-[![Release](https://img.shields.io/github/v/release/etalab-ia/ragtime-tech-preview?sort=date&style=flat-square)](https://github.com/etalab-ia/ragtime-tech-preview/releases)
-[![License](https://img.shields.io/github/license/etalab-ia/ragtime-tech-preview?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/etalab-ia/ragtime?sort=date&style=flat-square)](https://github.com/etalab-ia/ragtime/releases)
+[![License](https://img.shields.io/github/license/etalab-ia/ragtime?style=flat-square)](LICENSE)
+[![Status](https://img.shields.io/badge/status-alpha-orange?style=flat-square)](https://github.com/etalab-ia/ragtime#ragtime--a-modular-rag-pipeline-alpha)
 
 ```
  ██████╗  █████╗  ██████╗████████╗██╗███╗   ███╗███████╗
@@ -24,7 +25,7 @@ A modular RAG pipeline for the French government, powered by the [Albert API](ht
 Linux / macOS / WSL / Windows (Git Bash):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/etalab-ia/ragtime-tech-preview/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/etalab-ia/ragtime/main/install.sh | bash
 ```
 
 ## Quick Start
@@ -49,7 +50,7 @@ just learn
 Re-run the installer to get the latest version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/etalab-ia/ragtime-tech-preview/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/etalab-ia/ragtime/main/install.sh | bash
 ```
 
 ## Documentation
