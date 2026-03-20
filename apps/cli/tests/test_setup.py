@@ -770,7 +770,9 @@ class TestStructureSelectionPrompt:
     def test_default_mode_skips_all_select_prompts(self, mocker):
         """Without --expert, should ask no select questions (all choices use silent defaults)."""
         mock_q = mocker.patch("cli.commands.setup.questionary")
-        mock_q.text.return_value.ask.return_value = "test-key"
+        # Clear any existing API key from env to trigger password prompt
+        mocker.patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+        mock_q.password.return_value.ask.return_value = "test-key"
         mock_q.confirm.return_value.ask.return_value = False  # Abort at confirmation
 
         runner.invoke(main_app, ["setup", "/tmp/test"])
@@ -781,9 +783,13 @@ class TestStructureSelectionPrompt:
     def test_default_mode_defaults_to_standalone_chainlit_and_albert_rag(self, mocker):
         """Without --expert, should default to Standalone + Chainlit + Albert RAG + balanced preset."""
         mock_q = mocker.patch("cli.commands.setup.questionary")
-        # No select calls in non-expert mode — all choices use silent defaults
-        mock_q.text.return_value.ask.return_value = "test-key"
-        mock_q.confirm.return_value.ask.return_value = False  # Abort at confirmation
+        # Clear any existing API key from env to trigger password prompt
+        mocker.patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+        # Mock password prompt (no existing key in env, so user enters one)
+        mock_q.password.return_value.ask.return_value = "test-key"
+        # Mock confirmation prompts: first for "Directory exists", second for "Proceed with generation?"
+        # Return True for directory exists, False for generation to abort
+        mock_q.confirm.return_value.ask.side_effect = [True, False]
 
         result = runner.invoke(main_app, ["setup", "/tmp/test"])
 

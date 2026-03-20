@@ -770,13 +770,32 @@ def run(
         )
         console.print()
 
-        env_config["openai_api_key"] = questionary.text(
-            "OpenAI/Albert API Key:",
-            default=os.getenv("OPENAI_API_KEY", ""),
-        ).ask()
-        if env_config["openai_api_key"] is None:
-            console.print("[red]Aborted.[/red]")
-            raise typer.Exit(1)
+        # Prompt for API key without displaying it in clear text
+        existing_key = os.getenv("OPENAI_API_KEY", "")
+        if existing_key:
+            use_existing = questionary.confirm(
+                "Use existing OPENAI_API_KEY from environment?",
+                default=True,
+            ).ask()
+            if use_existing is None:
+                console.print("[red]Aborted.[/red]")
+                raise typer.Exit(1)
+            if use_existing:
+                env_config["openai_api_key"] = existing_key
+            else:
+                env_config["openai_api_key"] = questionary.password(
+                    "Enter new OpenAI/Albert API Key:",
+                ).ask()
+                if env_config["openai_api_key"] is None:
+                    console.print("[red]Aborted.[/red]")
+                    raise typer.Exit(1)
+        else:
+            env_config["openai_api_key"] = questionary.password(
+                "OpenAI/Albert API Key:",
+            ).ask()
+            if env_config["openai_api_key"] is None:
+                console.print("[red]Aborted.[/red]")
+                raise typer.Exit(1)
 
     # Use base URL from preset
     env_config["openai_base_url"] = preset_config["openai_base_url"]
