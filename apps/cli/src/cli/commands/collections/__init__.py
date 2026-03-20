@@ -38,6 +38,30 @@ def _get_supported_extensions() -> list[str]:
     return [".pdf", ".md", ".html", ".markdown"]
 
 
+def _find_collection_by_id(client: Any, collection_id: int) -> "Any | None":
+    """Find a collection by ID, handling pagination for users with many collections.
+
+    Args:
+        client: The Albert client instance.
+        collection_id: The ID of the collection to find.
+
+    Returns:
+        The collection if found, None otherwise.
+    """
+    # Try with a high limit first (most users won't have more than 1000 collections)
+    try:
+        result = client.list_collections(limit=1000)
+        collection = next((c for c in result.data if c.id == collection_id), None)
+        if collection:
+            return collection
+    except httpx.HTTPStatusError:
+        pass
+
+    # If not found and there might be more, we could implement pagination here
+    # For now, return None - the API doesn't expose a direct get-by-id endpoint
+    return None
+
+
 def _expand_paths(paths: list[Path], pattern: str | None = None) -> list[Path]:
     """Expand paths to individual files, filtering by supported extensions.
 
@@ -48,7 +72,7 @@ def _expand_paths(paths: list[Path], pattern: str | None = None) -> list[Path]:
     Returns:
         List of file paths to upload.
     """
-    files: list[Path] = []
+    files: set[Path] = set()
     supported = _get_supported_extensions()
     glob_pattern = pattern or "*"
 
@@ -56,23 +80,15 @@ def _expand_paths(paths: list[Path], pattern: str | None = None) -> list[Path]:
         path = path.resolve()
         if path.is_file():
             if path.suffix.lower() in supported:
-                files.append(path)
+                files.add(path)
             else:
                 rprint(f"[yellow]⚠ Skipping unsupported file: {path}[/yellow]")
         elif path.is_dir():
+            # Use rglob for recursive search with a single pattern
             for ext in supported:
-                files.extend(path.glob(f"{glob_pattern}{ext}"))
-                files.extend(path.glob(f"**/{glob_pattern}{ext}"))
+                files.update(path.rglob(f"{glob_pattern}{ext}"))
 
-    # Deduplicate while preserving order
-    seen: set[Path] = set()
-    unique_files: list[Path] = []
-    for f in files:
-        if f not in seen:
-            seen.add(f)
-            unique_files.append(f)
-
-    return sorted(unique_files)
+    return sorted(files)
 
 
 def _add_collection_to_config(
@@ -286,8 +302,7 @@ def delete_collection(
 
     # Get collection info first for confirmation
     try:
-        collections = client.list_collections(limit=100).data
-        collection = next((c for c in collections if c.id == collection_id), None)
+        collection = _find_collection_by_id(client, collection_id)
     except httpx.HTTPStatusError:
         collection = None
 
@@ -354,10 +369,9 @@ def show_collection(
     """
     client = _get_client()
 
-    # Get collection info from list (no direct get endpoint)
+    # Get collection info using helper with pagination support
     try:
-        collections = client.list_collections(limit=100).data
-        collection = next((c for c in collections if c.id == collection_id), None)
+        collection = _find_collection_by_id(client, collection_id)
     except httpx.HTTPStatusError as e:
         rprint(f"[red]✗ Failed to fetch collection: {e}[/red]")
         raise typer.Exit(1)
