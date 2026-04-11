@@ -14,3 +14,6 @@ just = "source:https://raw.githubusercontent.com/Phault/proto-toml-plugins/main/
 # Tool-specific versions
 [tools.just]
 version = "1.34.0"
+
+[settings]
+auto-install = true
